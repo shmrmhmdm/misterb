@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MisterB</string>
+    <string name="title_activity_main">MisterB</string>
+    <string name="package_name">com.misterb.app</string>
+    <string name="custom_url_scheme">com.misterb.app</string>
+</resources>
