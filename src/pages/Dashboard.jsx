@@ -1,5 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getSales, getExpenses, getLedger } from '../services/api';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  AreaChart,
+  Area
+} from 'recharts';
+import { TrendingUp, PieChart as PieIcon, BarChart3, Calendar } from 'lucide-react';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.95)',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        borderRadius: '10px',
+        padding: '10px 14px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(10px)',
+        fontSize: '0.85rem',
+        minWidth: '150px'
+      }}>
+        {label && <p style={{ margin: '0 0 6px 0', fontWeight: '700', color: '#f8fafc' }}>{label}</p>}
+        {payload.map((item, index) => (
+          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', margin: '4px 0', color: item.color || item.fill }}>
+            <span>{item.name}:</span>
+            <span style={{ fontWeight: '700' }}>₹{Number(item.value).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -21,7 +67,7 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
 
-  // We need to keep the raw data so we don't refetch on month change
+  // Raw data from Google Sheets
   const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [] });
 
   useEffect(() => {
@@ -44,17 +90,23 @@ const Dashboard = () => {
     setLoading(false);
   };
 
+  // Helper to parse date string
+  const parseDateStr = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  };
+
   const calculateSummary = (salesData, expensesData, ledgerData, monthStr) => {
     let totalSales = 0;
     let totalReceived = 0;
     let totalOutstanding = 0;
     let totalExpenses = 0;
 
-    // Helper to check if a date string matches the selected YYYY-MM
     const isSameMonth = (dateString) => {
-      if (!dateString) return false;
-      const d = new Date(dateString);
-      if (isNaN(d.getTime())) return false; // Invalid date
+      const d = parseDateStr(dateString);
+      if (!d) return false;
       const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       return m === monthStr;
     };
@@ -82,7 +134,7 @@ const Dashboard = () => {
       });
     }
 
-    // Outstanding is usually calculated across ALL time, so we don't filter it by month
+    // Outstanding calculated across all time
     const shopOutstandings = {};
     if (validSales.length > 0) {
        let allSales = 0;
@@ -120,7 +172,7 @@ const Dashboard = () => {
       validExpenses.forEach(row => {
         if (isSameMonth(row[0])) {
           const amount = Number(row[3]) || 0;
-          const category = row[1] || 'Uncategorized';
+          const category = row[1] || 'Other';
           totalExpenses += amount;
           
           if (!expenseCategories[category]) {
@@ -144,6 +196,84 @@ const Dashboard = () => {
     setExpenseDetails(formattedExpenseDetails);
   };
 
+  // --- CHART 1: Daily Trend in Selected Month ---
+  const dailyChartData = useMemo(() => {
+    let validSales = rawData.sales?.length ? (String(rawData.sales[0][0]).toLowerCase().includes('date') ? rawData.sales.slice(1) : rawData.sales) : [];
+    let validExpenses = rawData.expenses?.length ? (String(rawData.expenses[0][0]).toLowerCase().includes('date') ? rawData.expenses.slice(1) : rawData.expenses) : [];
+
+    const dailyMap = {};
+
+    validSales.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (mStr === selectedMonth) {
+        const dayKey = `${String(d.getDate()).padStart(2, '0')}`;
+        if (!dailyMap[dayKey]) dailyMap[dayKey] = { day: dayKey, sales: 0, received: 0, expenses: 0 };
+        dailyMap[dayKey].sales += Number(row[4]) || 0;
+        dailyMap[dayKey].received += Number(row[6]) || 0;
+      }
+    });
+
+    validExpenses.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (mStr === selectedMonth) {
+        const dayKey = `${String(d.getDate()).padStart(2, '0')}`;
+        if (!dailyMap[dayKey]) dailyMap[dayKey] = { day: dayKey, sales: 0, received: 0, expenses: 0 };
+        dailyMap[dayKey].expenses += Number(row[3]) || 0;
+      }
+    });
+
+    return Object.keys(dailyMap)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => dailyMap[k]);
+  }, [rawData, selectedMonth]);
+
+  // --- CHART 2: Category Expenses Breakdown ---
+  const categoryChartData = useMemo(() => {
+    return expenseDetails.map(item => ({
+      name: item.category,
+      value: item.amount
+    }));
+  }, [expenseDetails]);
+
+  // --- CHART 3: Multi-Month Performance Trend ---
+  const multiMonthData = useMemo(() => {
+    let validSales = rawData.sales?.length ? (String(rawData.sales[0][0]).toLowerCase().includes('date') ? rawData.sales.slice(1) : rawData.sales) : [];
+    let validExpenses = rawData.expenses?.length ? (String(rawData.expenses[0][0]).toLowerCase().includes('date') ? rawData.expenses.slice(1) : rawData.expenses) : [];
+
+    const monthMap = {};
+
+    validSales.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const mLabel = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (!monthMap[mKey]) monthMap[mKey] = { month: mLabel, key: mKey, sales: 0, expenses: 0, received: 0 };
+      monthMap[mKey].sales += Number(row[4]) || 0;
+      monthMap[mKey].received += Number(row[6]) || 0;
+    });
+
+    validExpenses.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const mLabel = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (!monthMap[mKey]) monthMap[mKey] = { month: mLabel, key: mKey, sales: 0, expenses: 0, received: 0 };
+      monthMap[mKey].expenses += Number(row[3]) || 0;
+    });
+
+    return Object.keys(monthMap)
+      .sort()
+      .slice(-6) // Last 6 recorded months
+      .map(k => ({
+        ...monthMap[k],
+        netProfit: monthMap[k].received - monthMap[k].expenses
+      }));
+  }, [rawData]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
@@ -160,46 +290,149 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {loading ? <p>Loading summary data...</p> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-          <div className="card" style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6' }}>
-            <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Sales (This Month)</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalSales}</p>
+      {loading ? <p>Loading summary & charts...</p> : (
+        <>
+          {/* Summary Metric Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div className="card" style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6' }}>
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Sales (This Month)</h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalSales.toLocaleString()}</p>
+            </div>
+            <div className="card" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeft: '4px solid #10b981' }}>
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Received (This Month)</h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalReceived.toLocaleString()}</p>
+            </div>
+            <div 
+              className="card" 
+              style={{ background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', cursor: 'pointer', transition: 'transform 0.2s' }}
+              onClick={() => setShowExpenseModal(true)}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title="Click to view category-wise expenses"
+            >
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Expenses (This Month) <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalExpenses.toLocaleString()}</p>
+            </div>
+            <div 
+              className="card" 
+              style={{ background: 'rgba(245, 158, 11, 0.1)', borderLeft: '4px solid #f59e0b', cursor: 'pointer', transition: 'transform 0.2s' }}
+              onClick={() => setShowModal(true)}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title="Click to view shop-wise details"
+            >
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Total Outstanding <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalOutstanding.toLocaleString()}</p>
+            </div>
+            
+            <div className="card" style={{ background: 'rgba(99, 102, 241, 0.1)', borderLeft: '4px solid #6366f1', gridColumn: '1 / -1' }}>
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Net Cash (This Month)</h3>
+              <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: summary.netCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                ₹{summary.netCash.toLocaleString()}
+              </p>
+            </div>
           </div>
-          <div className="card" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeft: '4px solid #10b981' }}>
-            <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Received (This Month)</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalReceived}</p>
+
+          {/* CHARTS ROW 1 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+            {/* Daily Sales & Received Trend */}
+            <div className="card" style={{ minHeight: '340px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
+                <BarChart3 size={20} color="#3b82f6" /> Daily Sales & Collection (Day-wise)
+              </h3>
+              {dailyChartData.length === 0 ? (
+                <div style={{ height: '240px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                  No entries for this month yet.
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dailyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="day" stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
+                      <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                      <Bar dataKey="sales" name="Sales (₹)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="received" name="Received (₹)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Category Expenses Breakdown */}
+            <div className="card" style={{ minHeight: '340px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
+                <PieIcon size={20} color="#ef4444" /> Expense Breakdown (ചെലവുകൾ)
+              </h3>
+              {categoryChartData.length === 0 ? (
+                <div style={{ height: '240px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                  No expenses recorded for this month.
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {categoryChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="horizontal" 
+                        verticalAlign="bottom" 
+                        align="center"
+                        wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
           </div>
-          <div 
-            className="card" 
-            style={{ background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', cursor: 'pointer', transition: 'transform 0.2s' }}
-            onClick={() => setShowExpenseModal(true)}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            title="Click to view category-wise expenses"
-          >
-            <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Expenses (This Month) <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalExpenses}</p>
-          </div>
-          <div 
-            className="card" 
-            style={{ background: 'rgba(245, 158, 11, 0.1)', borderLeft: '4px solid #f59e0b', cursor: 'pointer', transition: 'transform 0.2s' }}
-            onClick={() => setShowModal(true)}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            title="Click to view shop-wise details"
-          >
-            <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Total Outstanding <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalOutstanding}</p>
-          </div>
-          
-          <div className="card" style={{ background: 'rgba(99, 102, 241, 0.1)', borderLeft: '4px solid #6366f1', gridColumn: '1 / -1' }}>
-            <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Net Cash (This Month)</h3>
-            <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: summary.netCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-              ₹{summary.netCash}
-            </p>
-          </div>
-        </div>
+
+          {/* CHARTS ROW 2: Multi-Month Trend */}
+          {multiMonthData.length > 1 && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
+                <TrendingUp size={20} color="#10b981" /> Monthly Overview & Trends (മാസാമാസമുള്ള കണക്ക്)
+              </h3>
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={multiMonthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
+                    <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Area type="monotone" dataKey="sales" name="Sales (₹)" stroke="#3b82f6" fillOpacity={1} fill="url(#colorSales)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="expenses" name="Expenses (₹)" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpenses)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal for Shop Outstanding Details */}
