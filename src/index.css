@@ -243,3 +243,10 @@ tr:hover {
 .badge-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
 .badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .badge-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+

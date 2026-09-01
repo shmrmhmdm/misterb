@@ -107,6 +107,63 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "deleteSale") {
+    var salesSheet = sheet.getSheetByName("Sales");
+    var rowIndex = params.rowIndex;
+    if (salesSheet && rowIndex) {
+      salesSheet.deleteRow(rowIndex);
+    }
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "deleteMonthData") {
+    var targetMonth = params.month; // e.g. "2026-09"
+    var targetType = params.type || "all"; // "all", "sales", "expenses"
+    var deletedSalesCount = 0;
+    var deletedExpensesCount = 0;
+
+    function isMatchMonth(cellValue, monthStr) {
+      if (!cellValue) return false;
+      var d = new Date(cellValue);
+      if (isNaN(d.getTime())) return false;
+      var yyyy = d.getFullYear();
+      var mm = ("0" + (d.getMonth() + 1)).slice(-2);
+      return (yyyy + "-" + mm) === monthStr;
+    }
+
+    if (targetType === "all" || targetType === "sales") {
+      var salesSheet = sheet.getSheetByName("Sales");
+      if (salesSheet) {
+        var salesData = salesSheet.getDataRange().getValues();
+        for (var i = salesData.length - 1; i >= 1; i--) {
+          if (isMatchMonth(salesData[i][0], targetMonth)) {
+            salesSheet.deleteRow(i + 1);
+            deletedSalesCount++;
+          }
+        }
+      }
+    }
+
+    if (targetType === "all" || targetType === "expenses") {
+      var expenseSheet = sheet.getSheetByName("Expenses");
+      if (expenseSheet) {
+        var expenseData = expenseSheet.getDataRange().getValues();
+        for (var j = expenseData.length - 1; j >= 1; j--) {
+          if (isMatchMonth(expenseData[j][0], targetMonth)) {
+            expenseSheet.deleteRow(j + 1);
+            deletedExpensesCount++;
+          }
+        }
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      deletedSales: deletedSalesCount,
+      deletedExpenses: deletedExpensesCount
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSales, addSale, editSale, getShops, getProducts } from '../services/api';
+import { getSales, addSale, editSale, deleteSale, getShops, getProducts } from '../services/api';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -116,6 +116,18 @@ const Sales = () => {
     setEditingRow(null);
   };
 
+  const handleDeleteClick = async (rowIndex) => {
+    if (window.confirm("Are you sure you want to delete this sale entry?")) {
+      try {
+        await deleteSale(rowIndex);
+        if (editingRow === rowIndex) cancelEdit();
+        fetchSalesAndMasters();
+      } catch (error) {
+        alert("Error deleting sale");
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -224,7 +236,10 @@ const Sales = () => {
                       <td><span className="badge badge-success">₹{row[4]}</span></td>
                       <td>₹{row[6]}</td>
                       <td>
-                         <button onClick={() => handleEditClick(saleObj)} className="btn" style={{padding:'4px 8px', fontSize:'0.8rem'}}>Edit</button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleEditClick(saleObj)} className="btn" style={{padding:'4px 8px', fontSize:'0.8rem'}}>Edit</button>
+                          <button onClick={() => handleDeleteClick(saleObj.rowNumber)} className="btn" style={{padding:'4px 8px', fontSize:'0.8rem', background: 'var(--danger)'}}>Delete</button>
+                        </div>
                       </td>
                     </tr>
                   );

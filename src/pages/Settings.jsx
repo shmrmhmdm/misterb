@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getShops, getProducts, addShop, editShop, deleteShop, addProduct, editProduct, deleteProduct } from '../services/api';
+import { getShops, getProducts, addShop, editShop, deleteShop, addProduct, editProduct, deleteProduct, deleteMonthData } from '../services/api';
 
 const Settings = () => {
   const [shops, setShops] = useState([]);
@@ -15,6 +15,15 @@ const Settings = () => {
   const [itemPrice, setItemPrice] = useState('');
   const [productSubmitting, setProductSubmitting] = useState(false);
   const [editingProductRow, setEditingProductRow] = useState(null);
+
+  // Month bulk delete state
+  const [deleteMonth, setDeleteMonth] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [deleteType, setDeleteType] = useState('all');
+  const [deletingMonth, setDeletingMonth] = useState(false);
+  const [deleteFeedback, setDeleteFeedback] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -141,10 +150,192 @@ const Settings = () => {
     setProductSubmitting(false);
   };
 
+  // --- MONTH BULK DELETE HANDLER ---
+  const handleDeleteMonthData = async (e) => {
+    e.preventDefault();
+    if (!deleteMonth) {
+      alert("Please select a month.");
+      return;
+    }
+
+    const typeLabel = deleteType === 'all' ? 'All (Sales & Expenses)' : (deleteType === 'sales' ? 'Sales' : 'Expenses');
+    const isConfirmed = window.confirm(
+      `⚠️ WARNING: Are you sure you want to permanently delete all ${typeLabel} records for ${deleteMonth}?\n\nThis cannot be undone!`
+    );
+
+    if (!isConfirmed) return;
+
+    setDeletingMonth(true);
+    setDeleteFeedback('');
+    try {
+      await deleteMonthData(deleteMonth, deleteType);
+      setDeleteFeedback(`✅ Selected ${typeLabel} data for ${deleteMonth} has been deleted successfully!`);
+    } catch (error) {
+      setDeleteFeedback('❌ Failed to delete month data. Please check your Google Apps Script setup.');
+    }
+    setDeletingMonth(false);
+  };
+
+  // Change PIN state
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [pinFeedback, setPinFeedback] = useState('');
+
+  const handleChangePin = (e) => {
+    e.preventDefault();
+    const savedPin = localStorage.getItem('misterb_pin') || '1234';
+
+    if (currentPin !== savedPin) {
+      setPinFeedback('❌ നിലവിലെ പിൻ (Current PIN) തെറ്റാണ്!');
+      return;
+    }
+
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setPinFeedback('❌ പുതിയ പിൻ കൃത്യം 4 അക്കങ്ങൾ (digits) ആയിരിക്കണം!');
+      return;
+    }
+
+    if (newPin !== confirmNewPin) {
+      setPinFeedback('❌ പുതിയ പിൻ കൺഫേം ചെയ്തതുമായി ഒത്തുപോകുന്നില്ല!');
+      return;
+    }
+
+    localStorage.setItem('misterb_pin', newPin);
+    setPinFeedback('✅ സുരക്ഷാ പിൻ വിജയകരമായി മാറ്റി!');
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmNewPin('');
+  };
+
   return (
     <div>
       <h1>Settings / Master Data</h1>
+
+      {/* Security: Change App PIN */}
+      <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid var(--accent-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
+        <h3 style={{ color: 'var(--accent-primary)', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          🔒 Change Security PIN (സുരക്ഷാ പിൻ മാറ്റുക)
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+          ആപ്പ് തുറക്കുമ്പോൾ ചോദിക്കുന്ന 4-അക്ക സുരക്ഷാ പിൻ മാറ്റാൻ താഴെ വിവരങ്ങൾ നൽകുക.
+        </p>
+
+        <form onSubmit={handleChangePin}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Current PIN (നിലവിലെ പിൻ)</label>
+              <input 
+                type="password" 
+                maxLength={4}
+                className="form-input" 
+                placeholder="****"
+                value={currentPin} 
+                onChange={(e) => setCurrentPin(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">New 4-Digit PIN (പുതിയ പിൻ)</label>
+              <input 
+                type="password" 
+                maxLength={4}
+                className="form-input" 
+                placeholder="****"
+                value={newPin} 
+                onChange={(e) => setNewPin(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Confirm New PIN</label>
+              <input 
+                type="password" 
+                maxLength={4}
+                className="form-input" 
+                placeholder="****"
+                value={confirmNewPin} 
+                onChange={(e) => setConfirmNewPin(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '10px 16px' }}
+              >
+                Update PIN
+              </button>
+            </div>
+          </div>
+
+          {pinFeedback && (
+            <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: '8px', background: pinFeedback.startsWith('✅') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: pinFeedback.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
+              {pinFeedback}
+            </div>
+          )}
+        </form>
+      </div>
       
+      {/* Month Data Management / Bulk Delete */}
+      <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid var(--danger)', background: 'rgba(239, 68, 68, 0.05)' }}>
+        <h3 style={{ color: 'var(--danger)', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          🗑️ Delete Monthly Entries (മാസത്തെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യുക)
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
+          ഒരു നിർദ്ദിഷ്ട മാസത്തെ Sales അല്ലെങ്കിൽ Expenses വിവരങ്ങൾ ഒറ്റയടിക്ക് ഡിലീറ്റ് ചെയ്യാൻ താഴെ മാസം തിരഞ്ഞെടുക്കുക.
+        </p>
+
+        <form onSubmit={handleDeleteMonthData}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', alignItems: 'end' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontWeight: '600' }}>Select Month (മാസം)</label>
+              <input 
+                type="month" 
+                className="form-input" 
+                value={deleteMonth} 
+                onChange={(e) => setDeleteMonth(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontWeight: '600' }}>What to Delete (എന്താണ് ഡിലീറ്റ് ചെയ്യേണ്ടത്)</label>
+              <select 
+                className="form-input" 
+                value={deleteType} 
+                onChange={(e) => setDeleteType(e.target.value)}
+              >
+                <option value="all">🔴 All (Sales & Expenses)</option>
+                <option value="sales">🛒 Sales Only</option>
+                <option value="expenses">💸 Expenses Only</option>
+              </select>
+            </div>
+
+            <div>
+              <button 
+                type="submit" 
+                className="btn" 
+                style={{ background: 'var(--danger)', color: '#fff', width: '100%', padding: '10px 16px' }}
+                disabled={deletingMonth}
+              >
+                {deletingMonth ? 'Deleting Data...' : 'Delete Month Entries'}
+              </button>
+            </div>
+          </div>
+
+          {deleteFeedback && (
+            <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: '8px', background: deleteFeedback.startsWith('✅') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: deleteFeedback.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
+              {deleteFeedback}
+            </div>
+          )}
+        </form>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '24px' }}>
         {/* Add/Edit Shop Card */}
         <div className="card" style={{ border: editingShopRow ? '1px solid var(--primary)' : 'none' }}>

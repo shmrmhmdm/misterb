@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxILCQDzRa9Pm-9DCpHirhU5mwd2fZZRc8e3UVZPy8wM36OkmaP2sXLRMKfylaCi4P/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyK5i44uY8i66ZBzIupEBNiAhAPsOo4g9HrLAoXHEmUGoHFUzqvehr12BenRl1X0SqP/exec';
 
 export const addSale = async (data) => {
   try {
@@ -26,6 +26,36 @@ export const editSale = async (rowIndex, data) => {
     return { status: 'success' };
   } catch (error) {
     console.error('Error editing sale:', error);
+    throw error;
+  }
+};
+
+export const deleteSale = async (rowIndex) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteSale', rowIndex }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error deleting sale:', error);
+    throw error;
+  }
+};
+
+export const deleteMonthData = async (month, type = 'all') => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteMonthData', month, type }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error deleting month data:', error);
     throw error;
   }
 };
