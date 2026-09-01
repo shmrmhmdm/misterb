@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, BookOpen, Receipt, Menu, X, Settings as SettingsIcon, Lock } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, BookOpen, Receipt, Menu, X, Settings as SettingsIcon, Lock, FileText } from 'lucide-react';
 
 import Sales from './pages/Sales';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Ledger from './pages/Ledger';
 import Expenses from './pages/Expenses';
+import Reports from './pages/Reports';
 import PinLock from './components/PinLock';
 
 const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
@@ -17,6 +18,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
     { path: '/sales', name: 'Sales', icon: <ShoppingCart size={20} /> },
     { path: '/ledger', name: 'Ledger', icon: <BookOpen size={20} /> },
     { path: '/expenses', name: 'Expenses', icon: <Receipt size={20} /> },
+    { path: '/reports', name: 'Reports', icon: <FileText size={20} /> },
     { path: '/settings', name: 'Settings', icon: <SettingsIcon size={20} /> },
   ];
 
@@ -139,6 +141,7 @@ const App = () => {
             <Route path="/sales" element={<Sales />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
