@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getSales, getExpenses, getLedger } from '../services/api';
+import { getSales, getExpenses, getLedger, getCollections } from '../services/api';
 import {
   ResponsiveContainer,
   BarChart,
@@ -17,7 +17,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { TrendingUp, PieChart as PieIcon, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, PieChart as PieIcon, BarChart3, Calendar, Wallet } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
 
@@ -56,6 +56,8 @@ const Dashboard = () => {
   
   const [summary, setSummary] = useState({
     totalSales: 0,
+    cashAtSale: 0,
+    dueCollections: 0,
     totalReceived: 0,
     totalOutstanding: 0,
     totalExpenses: 0,
@@ -68,7 +70,7 @@ const Dashboard = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   // Raw data from Google Sheets
-  const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [] });
+  const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [], collections: [] });
 
   useEffect(() => {
     fetchData();
@@ -76,17 +78,17 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!loading && rawData.sales.length >= 0) {
-      calculateSummary(rawData.sales, rawData.expenses, rawData.ledger, selectedMonth);
+      calculateSummary(rawData.sales, rawData.expenses, rawData.ledger, rawData.collections, selectedMonth);
     }
   }, [selectedMonth, rawData]);
 
   const fetchData = async () => {
     setLoading(true);
-    const [salesData, expensesData, ledgerData] = await Promise.all([
-      getSales(), getExpenses(), getLedger()
+    const [salesData, expensesData, ledgerData, collectionsData] = await Promise.all([
+      getSales(), getExpenses(), getLedger(), getCollections()
     ]);
     
-    setRawData({ sales: salesData, expenses: expensesData, ledger: ledgerData });
+    setRawData({ sales: salesData, expenses: expensesData, ledger: ledgerData, collections: collectionsData });
     setLoading(false);
   };
 
@@ -98,10 +100,10 @@ const Dashboard = () => {
     return d;
   };
 
-  const calculateSummary = (salesData, expensesData, ledgerData, monthStr) => {
+  const calculateSummary = (salesData, expensesData, ledgerData, collectionsData, monthStr) => {
     let totalSales = 0;
-    let totalReceived = 0;
-    let totalOutstanding = 0;
+    let cashAtSale = 0;
+    let dueCollections = 0;
     let totalExpenses = 0;
 
     const isSameMonth = (dateString) => {
@@ -125,23 +127,43 @@ const Dashboard = () => {
       else validExpenses = expensesData;
     }
 
+    let validCollections = [];
+    if (collectionsData && collectionsData.length > 0) {
+      const firstCell = String(collectionsData[0][0]).toLowerCase();
+      if (firstCell === 'date' || firstCell === 'തീയതി') validCollections = collectionsData.slice(1);
+      else validCollections = collectionsData;
+    }
+
+    // Month sales & cash at sale
     if (validSales.length > 0) {
       validSales.forEach(row => {
         if (isSameMonth(row[0])) {
           totalSales += Number(row[4]) || 0;
-          totalReceived += Number(row[6]) || 0;
+          cashAtSale += Number(row[6]) || 0;
         }
       });
     }
 
-    // Outstanding calculated across all time
+    // Month due collections
+    if (validCollections.length > 0) {
+      validCollections.forEach(row => {
+        if (isSameMonth(row[0])) {
+          dueCollections += Number(row[2]) || 0;
+        }
+      });
+    }
+
+    const totalReceived = cashAtSale + dueCollections;
+
+    // Outstanding calculated across all time including sales & collections
     const shopOutstandings = {};
+    let allSales = 0;
+    let allReceived = 0;
+
     if (validSales.length > 0) {
-       let allSales = 0;
-       let allReceived = 0;
        validSales.forEach(row => {
           const date = row[0];
-          const shop = row[1];
+          const shop = (row[1] || '').trim();
           const price = Number(row[4]) || 0;
           const cashRec = Number(row[6]) || 0;
           
@@ -156,8 +178,26 @@ const Dashboard = () => {
              if (date) shopOutstandings[shop].lastDate = date; 
           }
        });
-       totalOutstanding = allSales - allReceived;
     }
+
+    if (validCollections.length > 0) {
+      validCollections.forEach(row => {
+        const date = row[0];
+        const shop = (row[1] || '').trim();
+        const amount = Number(row[2]) || 0;
+
+        allReceived += amount;
+        if (shop) {
+          if (!shopOutstandings[shop]) {
+            shopOutstandings[shop] = { outstanding: 0, lastDate: date };
+          }
+          shopOutstandings[shop].outstanding -= amount;
+          if (date) shopOutstandings[shop].lastDate = date;
+        }
+      });
+    }
+
+    const totalOutstanding = allSales - allReceived;
     
     const formattedShopDetails = Object.keys(shopOutstandings)
       .map(shop => ({
@@ -165,7 +205,8 @@ const Dashboard = () => {
          outstanding: shopOutstandings[shop].outstanding,
          lastDate: shopOutstandings[shop].lastDate
       }))
-      .filter(s => s.outstanding !== 0); 
+      .filter(s => s.outstanding !== 0)
+      .sort((a, b) => b.outstanding - a.outstanding); 
 
     const expenseCategories = {};
     if (validExpenses.length > 0) {
@@ -191,7 +232,7 @@ const Dashboard = () => {
       .filter(c => c.amount > 0);
 
     const netCash = totalReceived - totalExpenses;
-    setSummary({ totalSales, totalReceived, totalOutstanding, totalExpenses, netCash });
+    setSummary({ totalSales, cashAtSale, dueCollections, totalReceived, totalOutstanding, totalExpenses, netCash });
     setShopDetails(formattedShopDetails);
     setExpenseDetails(formattedExpenseDetails);
   };
@@ -200,6 +241,7 @@ const Dashboard = () => {
   const dailyChartData = useMemo(() => {
     let validSales = rawData.sales?.length ? (String(rawData.sales[0][0]).toLowerCase().includes('date') ? rawData.sales.slice(1) : rawData.sales) : [];
     let validExpenses = rawData.expenses?.length ? (String(rawData.expenses[0][0]).toLowerCase().includes('date') ? rawData.expenses.slice(1) : rawData.expenses) : [];
+    let validCollections = rawData.collections?.length ? (String(rawData.collections[0][0]).toLowerCase().includes('date') ? rawData.collections.slice(1) : rawData.collections) : [];
 
     const dailyMap = {};
 
@@ -212,6 +254,17 @@ const Dashboard = () => {
         if (!dailyMap[dayKey]) dailyMap[dayKey] = { day: dayKey, sales: 0, received: 0, expenses: 0 };
         dailyMap[dayKey].sales += Number(row[4]) || 0;
         dailyMap[dayKey].received += Number(row[6]) || 0;
+      }
+    });
+
+    validCollections.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (mStr === selectedMonth) {
+        const dayKey = `${String(d.getDate()).padStart(2, '0')}`;
+        if (!dailyMap[dayKey]) dailyMap[dayKey] = { day: dayKey, sales: 0, received: 0, expenses: 0 };
+        dailyMap[dayKey].received += Number(row[2]) || 0;
       }
     });
 
@@ -230,7 +283,6 @@ const Dashboard = () => {
       .sort((a, b) => Number(a) - Number(b))
       .map(k => dailyMap[k]);
   }, [rawData, selectedMonth]);
-
   // --- CHART 2: Category Expenses Breakdown ---
   const categoryChartData = useMemo(() => {
     return expenseDetails.map(item => ({
@@ -243,6 +295,7 @@ const Dashboard = () => {
   const multiMonthData = useMemo(() => {
     let validSales = rawData.sales?.length ? (String(rawData.sales[0][0]).toLowerCase().includes('date') ? rawData.sales.slice(1) : rawData.sales) : [];
     let validExpenses = rawData.expenses?.length ? (String(rawData.expenses[0][0]).toLowerCase().includes('date') ? rawData.expenses.slice(1) : rawData.expenses) : [];
+    let validCollections = rawData.collections?.length ? (String(rawData.collections[0][0]).toLowerCase().includes('date') ? rawData.collections.slice(1) : rawData.collections) : [];
 
     const monthMap = {};
 
@@ -254,6 +307,15 @@ const Dashboard = () => {
       if (!monthMap[mKey]) monthMap[mKey] = { month: mLabel, key: mKey, sales: 0, expenses: 0, received: 0 };
       monthMap[mKey].sales += Number(row[4]) || 0;
       monthMap[mKey].received += Number(row[6]) || 0;
+    });
+
+    validCollections.forEach(row => {
+      const d = parseDateStr(row[0]);
+      if (!d) return;
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const mLabel = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (!monthMap[mKey]) monthMap[mKey] = { month: mLabel, key: mKey, sales: 0, expenses: 0, received: 0 };
+      monthMap[mKey].received += Number(row[2]) || 0;
     });
 
     validExpenses.forEach(row => {
@@ -299,8 +361,11 @@ const Dashboard = () => {
               <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalSales.toLocaleString()}</p>
             </div>
             <div className="card" style={{ background: 'rgba(16, 185, 129, 0.1)', borderLeft: '4px solid #10b981' }}>
-              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Received (This Month)</h3>
+              <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Cash Inflow (This Month)</h3>
               <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalReceived.toLocaleString()}</p>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Sale: ₹{summary.cashAtSale.toLocaleString()} | Due: ₹{summary.dueCollections.toLocaleString()}
+              </div>
             </div>
             <div 
               className="card" 

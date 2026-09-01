@@ -107,6 +107,34 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "addCollection") {
+    var collectionSheet = sheet.getSheetByName("Collections");
+    if(!collectionSheet) {
+      collectionSheet = sheet.insertSheet("Collections");
+      collectionSheet.appendRow(["Date", "Shop", "Amount", "Payment Mode", "Collected By", "Notes"]);
+    }
+    collectionSheet.appendRow([params.data.date, params.data.shop, params.data.amount, params.data.paymentMode, params.data.collectedBy, params.data.notes]);
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "editCollection") {
+    var collectionSheet = sheet.getSheetByName("Collections");
+    var rowIndex = params.rowIndex;
+    if (collectionSheet && rowIndex) {
+      collectionSheet.getRange(rowIndex, 1, 1, 6).setValues([[params.data.date, params.data.shop, params.data.amount, params.data.paymentMode, params.data.collectedBy, params.data.notes]]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "deleteCollection") {
+    var collectionSheet = sheet.getSheetByName("Collections");
+    var rowIndex = params.rowIndex;
+    if (collectionSheet && rowIndex) {
+      collectionSheet.deleteRow(rowIndex);
+    }
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === "deleteSale") {
     var salesSheet = sheet.getSheetByName("Sales");
     var rowIndex = params.rowIndex;
@@ -118,9 +146,10 @@ function doPost(e) {
 
   if (action === "deleteMonthData") {
     var targetMonth = params.month; // e.g. "2026-09"
-    var targetType = params.type || "all"; // "all", "sales", "expenses"
+    var targetType = params.type || "all"; // "all", "sales", "expenses", "collections"
     var deletedSalesCount = 0;
     var deletedExpensesCount = 0;
+    var deletedCollectionsCount = 0;
 
     function isMatchMonth(cellValue, monthStr) {
       if (!cellValue) return false;
@@ -157,10 +186,24 @@ function doPost(e) {
       }
     }
 
+    if (targetType === "all" || targetType === "collections") {
+      var collectionSheet = sheet.getSheetByName("Collections");
+      if (collectionSheet) {
+        var collData = collectionSheet.getDataRange().getValues();
+        for (var k = collData.length - 1; k >= 1; k--) {
+          if (isMatchMonth(collData[k][0], targetMonth)) {
+            collectionSheet.deleteRow(k + 1);
+            deletedCollectionsCount++;
+          }
+        }
+      }
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
       deletedSales: deletedSalesCount,
-      deletedExpenses: deletedExpensesCount
+      deletedExpenses: deletedExpensesCount,
+      deletedCollections: deletedCollectionsCount
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -172,12 +215,20 @@ function doGet(e) {
   var action = e.parameter.action;
 
   if (action === "getSales") {
-    var data = sheet.getSheetByName("Sales").getDataRange().getValues();
+    var salesSheet = sheet.getSheetByName("Sales");
+    var data = salesSheet ? salesSheet.getDataRange().getValues() : [];
+    return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "getCollections") {
+    var collectionSheet = sheet.getSheetByName("Collections");
+    var data = collectionSheet ? collectionSheet.getDataRange().getValues() : [];
     return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
   }
   
   if (action === "getLedger") {
-    var data = sheet.getSheetByName("Ledger").getDataRange().getValues();
+    var ledgerSheet = sheet.getSheetByName("Ledger");
+    var data = ledgerSheet ? ledgerSheet.getDataRange().getValues() : [];
     return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
   }
   

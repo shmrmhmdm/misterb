@@ -244,3 +244,59 @@ export const getExpenses = async () => {
     return [];
   }
 };
+
+export const addCollection = async (data) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addCollection', data }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error adding collection:', error);
+    throw error;
+  }
+};
+
+export const editCollection = async (rowIndex, data) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'editCollection', rowIndex, data }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error editing collection:', error);
+    throw error;
+  }
+};
+
+export const deleteCollection = async (rowIndex) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteCollection', rowIndex }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error deleting collection:', error);
+    throw error;
+  }
+};
+
+export const getCollections = async () => {
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=getCollections&t=${new Date().getTime()}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching collections:', error);
+    return [];
+  }
+};
+

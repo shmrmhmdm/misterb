@@ -310,8 +310,9 @@ const Settings = () => {
                 value={deleteType} 
                 onChange={(e) => setDeleteType(e.target.value)}
               >
-                <option value="all">🔴 All (Sales & Expenses)</option>
+                <option value="all">🔴 All (Sales, Collections & Expenses)</option>
                 <option value="sales">🛒 Sales Only</option>
+                <option value="collections">💰 Due Collections Only</option>
                 <option value="expenses">💸 Expenses Only</option>
               </select>
             </div>

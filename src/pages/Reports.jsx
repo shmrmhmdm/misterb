@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getSales, getExpenses, getShops } from '../services/api';
+import { useLocation } from 'react-router-dom';
+import { getSales, getExpenses, getShops, getCollections } from '../services/api';
 import { 
   FileText, 
   Printer, 
@@ -10,15 +11,24 @@ import {
   TrendingDown, 
   Filter, 
   ArrowUpRight, 
-  ArrowDownRight 
+  ArrowDownRight,
+  Wallet,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 const Reports = () => {
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'shop' | 'expense'
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const initialTab = searchParams.get('tab') || 'summary';
+  const initialShopParam = searchParams.get('shop') || '';
+
+  const [activeTab, setActiveTab] = useState(initialTab); // 'summary' | 'shop' | 'expense' | 'collections'
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [shops, setShops] = useState([]);
+  const [collections, setCollections] = useState([]);
 
   // Date Filters
   const todayStr = new Date().toISOString().split('T')[0];
@@ -30,7 +40,7 @@ const Reports = () => {
   const [endDate, setEndDate] = useState(todayStr);
 
   // Shop filter
-  const [selectedShop, setSelectedShop] = useState('');
+  const [selectedShop, setSelectedShop] = useState(initialShopParam);
 
   // Expense Category filter
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -41,8 +51,8 @@ const Reports = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [salesData, expensesData, shopsData] = await Promise.all([
-      getSales(), getExpenses(), getShops()
+    const [salesData, expensesData, shopsData, collectionsData] = await Promise.all([
+      getSales(), getExpenses(), getShops(), getCollections()
     ]);
 
     // Parse sales
@@ -61,6 +71,14 @@ const Reports = () => {
     }
     setExpenses(validExpenses);
 
+    // Parse collections
+    let validCollections = [];
+    if (collectionsData && collectionsData.length > 0) {
+      const firstCell = String(collectionsData[0][0]).toLowerCase();
+      validCollections = (firstCell === 'date' || firstCell === 'തീയതി') ? collectionsData.slice(1) : collectionsData;
+    }
+    setCollections(validCollections);
+
     // Parse shops
     let validShops = [];
     if (shopsData && shopsData.length > 0) {
@@ -69,7 +87,7 @@ const Reports = () => {
     }
     setShops(validShops);
     if (validShops.length > 0 && !selectedShop) {
-      setSelectedShop(validShops[0][0]);
+      setSelectedShop(initialShopParam || validShops[0][0]);
     }
 
     setLoading(false);
@@ -118,6 +136,11 @@ const Reports = () => {
     return sales.filter(row => isWithinDateRange(row[0]));
   }, [sales, startDate, endDate]);
 
+  // Filtered Collections
+  const filteredCollections = useMemo(() => {
+    return collections.filter(row => isWithinDateRange(row[0]));
+  }, [collections, startDate, endDate]);
+
   // Filtered Expenses
   const filteredExpenses = useMemo(() => {
     return expenses.filter(row => {
@@ -127,58 +150,110 @@ const Reports = () => {
     });
   }, [expenses, startDate, endDate, selectedCategory]);
 
-  // Shop-specific Statement Data
+  // Shop-specific Statement Data (Combined Sales & Due Collections)
   const shopStatementData = useMemo(() => {
-    if (!selectedShop) return { rows: [], totalSales: 0, totalReceived: 0, balance: 0 };
+    if (!selectedShop) return { rows: [], totalSales: 0, totalReceived: 0, rangeSales: 0, rangePaid: 0, currentOutstanding: 0 };
 
-    const shopSales = sales.filter(row => (row[1] || '').trim().toLowerCase() === selectedShop.trim().toLowerCase());
-    
-    // Overall balance across all time for this shop
+    const cleanShop = selectedShop.trim().toLowerCase();
+
+    // 1. All-time Sales and Collections for this shop
+    const shopSalesAll = sales.filter(row => (row[1] || '').trim().toLowerCase() === cleanShop);
+    const shopCollAll = collections.filter(row => (row[1] || '').trim().toLowerCase() === cleanShop);
+
     let allTimeSales = 0;
     let allTimeReceived = 0;
-    shopSales.forEach(row => {
+
+    shopSalesAll.forEach(row => {
       allTimeSales += Number(row[4]) || 0;
       allTimeReceived += Number(row[6]) || 0;
     });
+
+    shopCollAll.forEach(row => {
+      allTimeReceived += Number(row[2]) || 0;
+    });
+
     const currentOutstanding = allTimeSales - allTimeReceived;
 
-    // Filtered by selected date range for statement view
-    const dateFiltered = shopSales.filter(row => isWithinDateRange(row[0]));
+    // 2. Build chronological unified ledger for the shop
+    const combinedTransactions = [];
+
+    shopSalesAll.forEach(row => {
+      if (isWithinDateRange(row[0])) {
+        combinedTransactions.push({
+          date: row[0],
+          type: 'Sale',
+          item: row[2] || 'Item Sale',
+          qty: row[3] || '',
+          debit: Number(row[4]) || 0,       // Sale amount (+)
+          credit: Number(row[6]) || 0,      // Paid at sale (-)
+          paymentMode: 'At Sale',
+          by: row[5] || '',
+          notes: ''
+        });
+      }
+    });
+
+    shopCollAll.forEach(row => {
+      if (isWithinDateRange(row[0])) {
+        combinedTransactions.push({
+          date: row[0],
+          type: 'Due Collection',
+          item: 'Due Collection / Payment',
+          qty: '',
+          debit: 0,
+          credit: Number(row[2]) || 0,      // Collection amount (-)
+          paymentMode: row[3] || 'Cash',
+          by: row[4] || '',
+          notes: row[5] || ''
+        });
+      }
+    });
+
+    // Sort chronologically by date
+    combinedTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
     let rangeSales = 0;
-    let rangeReceived = 0;
-    dateFiltered.forEach(row => {
-      rangeSales += Number(row[4]) || 0;
-      rangeReceived += Number(row[6]) || 0;
+    let rangePaid = 0;
+
+    combinedTransactions.forEach(item => {
+      rangeSales += item.debit;
+      rangePaid += item.credit;
     });
 
     return {
-      rows: dateFiltered,
+      rows: combinedTransactions,
       rangeSales,
-      rangeReceived,
+      rangePaid,
       currentOutstanding
     };
-  }, [sales, selectedShop, startDate, endDate]);
+  }, [sales, collections, selectedShop, startDate, endDate]);
 
   // Overall Financial Totals for Filtered Range
   const summaryTotals = useMemo(() => {
     let totalSales = 0;
-    let totalReceived = 0;
+    let cashAtSale = 0;
+    let dueCollections = 0;
     let totalExpenses = 0;
 
     filteredSales.forEach(row => {
       totalSales += Number(row[4]) || 0;
-      totalReceived += Number(row[6]) || 0;
+      cashAtSale += Number(row[6]) || 0;
+    });
+
+    filteredCollections.forEach(row => {
+      dueCollections += Number(row[2]) || 0;
     });
 
     filteredExpenses.forEach(row => {
       totalExpenses += Number(row[3]) || 0;
     });
 
+    const totalReceived = cashAtSale + dueCollections;
     const netCash = totalReceived - totalExpenses;
     const creditGiven = totalSales - totalReceived;
 
-    return { totalSales, totalReceived, totalExpenses, netCash, creditGiven };
-  }, [filteredSales, filteredExpenses]);
+    return { totalSales, cashAtSale, dueCollections, totalReceived, totalExpenses, netCash, creditGiven };
+  }, [filteredSales, filteredCollections, filteredExpenses]);
 
   // Print Handler
   const handlePrint = () => {
@@ -191,9 +266,11 @@ const Reports = () => {
     let filename = `misterb_report_${startDate}_to_${endDate}.csv`;
 
     if (activeTab === 'summary') {
-      csvContent += `Mister B - Sales & Revenue Report (${startDate} to ${endDate})\n\n`;
+      csvContent += `Mister B - Financial Report (${startDate} to ${endDate})\n\n`;
       csvContent += `Total Sales,₹${summaryTotals.totalSales}\n`;
-      csvContent += `Cash Received,₹${summaryTotals.totalReceived}\n`;
+      csvContent += `Cash Received At Sale,₹${summaryTotals.cashAtSale}\n`;
+      csvContent += `Due Collections Received,₹${summaryTotals.dueCollections}\n`;
+      csvContent += `Total Cash Inflow,₹${summaryTotals.totalReceived}\n`;
       csvContent += `Total Expenses,₹${summaryTotals.totalExpenses}\n`;
       csvContent += `Net Cash Flow,₹${summaryTotals.netCash}\n\n`;
       
@@ -201,6 +278,12 @@ const Reports = () => {
       csvContent += `Date,Shop,Item,Quantity,Price,Cash Received,Sale By\n`;
       filteredSales.forEach(row => {
         csvContent += `"${row[0] || ''}","${row[1] || ''}","${row[2] || ''}","${row[3] || ''}","${row[4] || 0}","${row[6] || 0}","${row[5] || ''}"\n`;
+      });
+
+      csvContent += `\nDUE COLLECTIONS\n`;
+      csvContent += `Date,Shop,Amount Received,Payment Mode,Collected By,Notes\n`;
+      filteredCollections.forEach(row => {
+        csvContent += `"${row[0] || ''}","${row[1] || ''}","${row[2] || 0}","${row[3] || ''}","${row[4] || ''}","${row[5] || ''}"\n`;
       });
 
       csvContent += `\nEXPENSE TRANSACTIONS\n`;
@@ -213,12 +296,18 @@ const Reports = () => {
       csvContent += `Mister B - Shop Statement: ${selectedShop}\n`;
       csvContent += `Period: ${startDate} to ${endDate}\n`;
       csvContent += `Current Total Outstanding: ₹${shopStatementData.currentOutstanding}\n\n`;
-      csvContent += `Date,Shop,Item,Quantity,Total Price (₹),Cash Received (₹),Balance (₹)\n`;
+      csvContent += `Date,Transaction Type,Particulars,Debit/Sale (₹),Credit/Paid (₹),Payment Mode,By,Notes\n`;
       
       shopStatementData.rows.forEach(row => {
-        const price = Number(row[4]) || 0;
-        const rec = Number(row[6]) || 0;
-        csvContent += `"${row[0] || ''}","${row[1] || ''}","${row[2] || ''}","${row[3] || ''}","${price}","${rec}","${price - rec}"\n`;
+        csvContent += `"${row.date || ''}","${row.type}","${row.item}","${row.debit}","${row.credit}","${row.paymentMode}","${row.by}","${row.notes}"\n`;
+      });
+    } else if (activeTab === 'collections') {
+      filename = `misterb_collections_report_${startDate}_to_${endDate}.csv`;
+      csvContent += `Mister B - Due Collections Report (${startDate} to ${endDate})\n`;
+      csvContent += `Total Amount Collected: ₹${summaryTotals.dueCollections}\n\n`;
+      csvContent += `Date,Shop,Amount (₹),Payment Mode,Collected By,Notes\n`;
+      filteredCollections.forEach(row => {
+        csvContent += `"${row[0] || ''}","${row[1] || ''}","${row[2] || 0}","${row[3] || ''}","${row[4] || ''}","${row[5] || ''}"\n`;
       });
     } else {
       filename = `misterb_expenses_report_${startDate}_to_${endDate}.csv`;
@@ -311,7 +400,7 @@ const Reports = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('summary')}
           className="btn"
@@ -336,6 +425,19 @@ const Reports = () => {
           }}
         >
           <Store size={16} /> Shop Statement
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('collections')}
+          className="btn"
+          style={{
+            background: activeTab === 'collections' ? 'var(--accent-gradient)' : 'transparent',
+            color: activeTab === 'collections' ? '#ffffff' : 'var(--text-secondary)',
+            border: 'none',
+            fontWeight: activeTab === 'collections' ? '600' : '500'
+          }}
+        >
+          <Wallet size={16} /> Collections Report
         </button>
 
         <button 
@@ -367,10 +469,13 @@ const Reports = () => {
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #10b981' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Cash Received (ലഭിച്ചത്)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Cash Inflow (ലഭിച്ചത്)</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: '#10b981' }}>
                     ₹{summaryTotals.totalReceived.toLocaleString()}
                   </p>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Sale: ₹{summaryTotals.cashAtSale.toLocaleString()} | Due Coll: ₹{summaryTotals.dueCollections.toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #ef4444' }}>
@@ -381,7 +486,7 @@ const Reports = () => {
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #6366f1' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Net Cash Balance</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Net Cash Flow (ലാഭം/ബാക്കി)</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: summaryTotals.netCash >= 0 ? '#10b981' : '#ef4444' }}>
                     ₹{summaryTotals.netCash.toLocaleString()}
                   </p>
@@ -431,6 +536,43 @@ const Reports = () => {
                   </table>
                 </div>
               </div>
+
+              {/* Due Collections in Range */}
+              <div className="card">
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Wallet size={18} color="#10b981" />
+                  Due Collections Received in Range ({filteredCollections.length})
+                </h3>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Shop Name</th>
+                        <th>Amount Received (₹)</th>
+                        <th>Payment Mode</th>
+                        <th>Collected By</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCollections.map((row, idx) => (
+                        <tr key={idx}>
+                          <td>{row[0] ? new Date(row[0]).toLocaleDateString() : 'N/A'}</td>
+                          <td style={{ fontWeight: '600' }}>{row[1]}</td>
+                          <td><span className="badge badge-success" style={{ fontSize: '0.9rem' }}>₹{Number(row[2] || 0).toLocaleString()}</span></td>
+                          <td><span className="badge badge-primary">{row[3] || 'Cash'}</span></td>
+                          <td>{row[4] || '-'}</td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{row[5] || '-'}</td>
+                        </tr>
+                      ))}
+                      {filteredCollections.length === 0 && (
+                        <tr><td colSpan="6" style={{ textAlign: 'center' }}>No due collections recorded for this period.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -463,14 +605,14 @@ const Reports = () => {
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #10b981' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Cash Paid in Selected Period</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Paid in Selected Period</span>
                   <p style={{ fontSize: '1.6rem', fontWeight: 'bold', margin: '4px 0 0 0' }}>
-                    ₹{shopStatementData.rangeReceived.toLocaleString()}
+                    ₹{shopStatementData.rangePaid.toLocaleString()}
                   </p>
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.08)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Current Total Outstanding (ആകെ ബാക്കി)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Current All-Time Outstanding (ആകെ ബാക്കി)</span>
                   <p style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: '4px 0 0 0', color: shopStatementData.currentOutstanding > 0 ? 'var(--danger)' : 'var(--success)' }}>
                     ₹{shopStatementData.currentOutstanding.toLocaleString()}
                   </p>
@@ -479,42 +621,53 @@ const Reports = () => {
 
               {/* Shop Ledger Transactions Table */}
               <div className="card">
-                <h3>Statement for {selectedShop}</h3>
+                <h3>Unified Statement for {selectedShop} ({shopStatementData.rows.length} Entries)</h3>
                 <div className="table-container">
                   <table>
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Item Details</th>
+                        <th>Type</th>
+                        <th>Particulars / Notes</th>
                         <th>Qty</th>
-                        <th>Amount (₹)</th>
-                        <th>Paid (₹)</th>
-                        <th>Balance for Order (₹)</th>
-                        <th>Salesperson</th>
+                        <th>Sale/Debit (₹)</th>
+                        <th>Paid/Credit (₹)</th>
+                        <th>Payment Mode</th>
+                        <th>Handled By</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {shopStatementData.rows.map((row, idx) => {
-                        const price = Number(row[4]) || 0;
-                        const rec = Number(row[6]) || 0;
-                        return (
-                          <tr key={idx}>
-                            <td>{row[0] ? new Date(row[0]).toLocaleDateString() : 'N/A'}</td>
-                            <td>{row[2]}</td>
-                            <td>{row[3]}</td>
-                            <td>₹{price.toLocaleString()}</td>
-                            <td><span className="badge badge-success">₹{rec.toLocaleString()}</span></td>
-                            <td>
-                              <span className={`badge ${price - rec > 0 ? 'badge-danger' : 'badge-success'}`}>
-                                ₹{(price - rec).toLocaleString()}
-                              </span>
-                            </td>
-                            <td>{row[5]}</td>
-                          </tr>
-                        );
-                      })}
+                      {shopStatementData.rows.map((row, idx) => (
+                        <tr key={idx}>
+                          <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
+                          <td>
+                            <span className={`badge ${row.type === 'Sale' ? 'badge-primary' : 'badge-success'}`}>
+                              {row.type}
+                            </span>
+                          </td>
+                          <td>
+                            <strong>{row.item}</strong>
+                            {row.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Note: {row.notes}</div>}
+                          </td>
+                          <td>{row.qty || '-'}</td>
+                          <td>
+                            {row.debit > 0 ? (
+                              <span style={{ fontWeight: '600', color: '#ef4444' }}>+₹{row.debit.toLocaleString()}</span>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            {row.credit > 0 ? (
+                              <span style={{ fontWeight: '600', color: '#10b981' }}>-₹{row.credit.toLocaleString()}</span>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{row.paymentMode}</span>
+                          </td>
+                          <td>{row.by || '-'}</td>
+                        </tr>
+                      ))}
                       {shopStatementData.rows.length === 0 && (
-                        <tr><td colSpan="7" style={{ textAlign: 'center' }}>No transactions found for {selectedShop} in this period.</td></tr>
+                        <tr><td colSpan="8" style={{ textAlign: 'center' }}>No transactions found for {selectedShop} in this period.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -523,7 +676,54 @@ const Reports = () => {
             </div>
           )}
 
-          {/* TAB 3: EXPENSE STATEMENT */}
+          {/* TAB 3: DUE COLLECTIONS REPORT */}
+          {activeTab === 'collections' && (
+            <div>
+              {/* Total Collections Card */}
+              <div className="card" style={{ borderLeft: '4px solid #10b981', marginBottom: '24px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Due Collections in Period</span>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '4px 0 0 0', color: '#10b981' }}>
+                  ₹{summaryTotals.dueCollections.toLocaleString()}
+                </p>
+              </div>
+
+              {/* Collections Table */}
+              <div className="card">
+                <h3>Due Collection Records ({filteredCollections.length})</h3>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Shop Name</th>
+                        <th>Amount (₹)</th>
+                        <th>Payment Mode</th>
+                        <th>Collected By</th>
+                        <th>Notes / Invoice Ref</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCollections.map((row, idx) => (
+                        <tr key={idx}>
+                          <td>{row[0] ? new Date(row[0]).toLocaleDateString() : 'N/A'}</td>
+                          <td style={{ fontWeight: '600' }}>{row[1]}</td>
+                          <td><span className="badge badge-success">₹{Number(row[2] || 0).toLocaleString()}</span></td>
+                          <td><span className="badge badge-primary">{row[3] || 'Cash'}</span></td>
+                          <td>{row[4] || '-'}</td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{row[5] || '-'}</td>
+                        </tr>
+                      ))}
+                      {filteredCollections.length === 0 && (
+                        <tr><td colSpan="6" style={{ textAlign: 'center' }}>No due collections recorded for this period.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: EXPENSE STATEMENT */}
           {activeTab === 'expense' && (
             <div>
               <div className="card" style={{ marginBottom: '20px' }}>

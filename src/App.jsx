@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, BookOpen, Receipt, Menu, X, Settings as SettingsIcon, Lock, FileText } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, BookOpen, Receipt, Menu, X, Settings as SettingsIcon, Lock, FileText, Wallet } from 'lucide-react';
 
 import Sales from './pages/Sales';
+import Collections from './pages/Collections';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Ledger from './pages/Ledger';
@@ -16,6 +17,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
   const navItems = [
     { path: '/', name: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/sales', name: 'Sales', icon: <ShoppingCart size={20} /> },
+    { path: '/collections', name: 'Collections', icon: <Wallet size={20} /> },
     { path: '/ledger', name: 'Ledger', icon: <BookOpen size={20} /> },
     { path: '/expenses', name: 'Expenses', icon: <Receipt size={20} /> },
     { path: '/reports', name: 'Reports', icon: <FileText size={20} /> },
@@ -139,6 +141,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/sales" element={<Sales />} />
+            <Route path="/collections" element={<Collections />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/reports" element={<Reports />} />
