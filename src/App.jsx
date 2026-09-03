@@ -34,8 +34,18 @@ const Sidebar = ({ isOpen, toggleSidebar, onLock, currentUser }) => {
                 Mister B
               </h1>
               {currentUser?.name && (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  👤 {currentUser.name} ({currentUser.role || 'Staff'})
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  {currentUser.photo ? (
+                    <img
+                      src={currentUser.photo}
+                      alt={currentUser.name}
+                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)' }}
+                      onError={(e) => e.target.style.display = 'none'}
+                    />
+                  ) : null}
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {currentUser.name} ({currentUser.role || 'Staff'})
+                  </span>
                 </div>
               )}
             </div>
@@ -145,13 +155,23 @@ const App = () => {
                   <Menu size={24} color="var(--text-primary)" />
                 </button>
               </div>
-              <div>
-                <h2 style={{ margin: 0 }}>Mister B App</h2>
-                {currentUser?.name && (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: '600' }}>
-                    👋 {currentUser.name}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {currentUser?.photo && (
+                  <img
+                    src={currentUser.photo}
+                    alt={currentUser.name}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-primary)', boxShadow: '0 0 10px rgba(59, 130, 246, 0.4)' }}
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
                 )}
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Mister B App</h2>
+                  {currentUser?.name && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: '600' }}>
+                      👋 {currentUser.name}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

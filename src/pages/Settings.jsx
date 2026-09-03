@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getShops, getProducts, addShop, editShop, deleteShop, addProduct, editProduct, deleteProduct, deleteMonthData, getUsers, addUser, editUser, deleteUser } from '../services/api';
-import { ShieldCheck, UserPlus, Phone, Trash2, Edit2, RefreshCw } from 'lucide-react';
+import { formatDriveImageUrl } from '../utils/imageHelper';
+import { ShieldCheck, UserPlus, Phone, Trash2, Edit2, RefreshCw, Image } from 'lucide-react';
 
 const Settings = () => {
   const [shops, setShops] = useState([]);
@@ -13,6 +14,7 @@ const Settings = () => {
   const [userName, setUserName] = useState('');
   const [userRole, setUserRole] = useState('Staff');
   const [userStatus, setUserStatus] = useState('Active');
+  const [userPhoto, setUserPhoto] = useState('');
   const [userSubmitting, setUserSubmitting] = useState(false);
   const [editingUserRow, setEditingUserRow] = useState(null);
   const [userFeedback, setUserFeedback] = useState('');
@@ -98,6 +100,7 @@ const Settings = () => {
     setUserName(uObj.data[1] || '');
     setUserRole(uObj.data[2] || 'Staff');
     setUserStatus(uObj.data[3] || 'Active');
+    setUserPhoto(uObj.data[4] || '');
     setEditingUserRow(uObj.rowNumber);
   };
 
@@ -106,6 +109,7 @@ const Settings = () => {
     setUserName('');
     setUserRole('Staff');
     setUserStatus('Active');
+    setUserPhoto('');
     setEditingUserRow(null);
   };
 
@@ -128,10 +132,10 @@ const Settings = () => {
     setUserFeedback('');
     try {
       if (editingUserRow) {
-        await editUser(editingUserRow, { phone: userPhone, name: userName, role: userRole, status: userStatus });
+        await editUser(editingUserRow, { phone: userPhone, name: userName, role: userRole, status: userStatus, photo: userPhoto });
         setUserFeedback('✅ Authorized number updated successfully!');
       } else {
-        await addUser({ phone: userPhone, name: userName, role: userRole, status: userStatus });
+        await addUser({ phone: userPhone, name: userName, role: userRole, status: userStatus, photo: userPhoto });
         setUserFeedback('✅ Authorized number added successfully!');
       }
       cancelEditUser();
@@ -364,6 +368,17 @@ const Settings = () => {
               </select>
             </div>
 
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontWeight: '600' }}>Photo URL (Drive Link)</label>
+              <input 
+                type="url" 
+                className="form-input" 
+                placeholder="Google Drive / Image link"
+                value={userPhoto} 
+                onChange={(e) => setUserPhoto(e.target.value)} 
+              />
+            </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 type="submit" 
@@ -405,6 +420,7 @@ const Settings = () => {
               <table>
                 <thead>
                   <tr>
+                    <th>Photo</th>
                     <th>Mobile Number</th>
                     <th>Name</th>
                     <th>Role</th>
@@ -413,45 +429,62 @@ const Settings = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: '600', color: 'var(--accent-primary)' }}>{u.data[0]}</td>
-                      <td>{u.data[1] || '-'}</td>
-                      <td>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: u.data[2] === 'Admin' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                          color: u.data[2] === 'Admin' ? 'var(--accent-primary)' : 'var(--text-primary)'
-                        }}>
-                          {u.data[2] || 'Staff'}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: String(u.data[3]).toLowerCase() === 'inactive' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                          color: String(u.data[3]).toLowerCase() === 'inactive' ? 'var(--danger)' : 'var(--success)'
-                        }}>
-                          {u.data[3] || 'Active'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={() => handleEditUserClick(u)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Edit</button>
-                          <button onClick={() => handleDeleteUser(u.rowNumber)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--danger)' }}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map((u, idx) => {
+                    const photoImgUrl = formatDriveImageUrl(u.data[4] || '');
+                    return (
+                      <tr key={idx}>
+                        <td>
+                          {photoImgUrl ? (
+                            <img
+                              src={photoImgUrl}
+                              alt={u.data[1] || 'User'}
+                              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)' }}
+                              onError={(e) => e.target.style.display = 'none'}
+                            />
+                          ) : (
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                              {(u.data[1] || 'U').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontWeight: '600', color: 'var(--accent-primary)' }}>{u.data[0]}</td>
+                        <td>{u.data[1] || '-'}</td>
+                        <td>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            background: u.data[2] === 'Admin' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                            color: u.data[2] === 'Admin' ? 'var(--accent-primary)' : 'var(--text-primary)'
+                          }}>
+                            {u.data[2] || 'Staff'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            background: String(u.data[3]).toLowerCase() === 'inactive' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                            color: String(u.data[3]).toLowerCase() === 'inactive' ? 'var(--danger)' : 'var(--success)'
+                          }}>
+                            {u.data[3] || 'Active'}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => handleEditUserClick(u)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Edit</button>
+                            <button onClick={() => handleDeleteUser(u.rowNumber)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--danger)' }}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                         No authorized numbers found. Add a number above or in the Google Sheet 'Users' tab.
                       </td>
                     </tr>

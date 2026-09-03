@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, LogIn, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Phone, LogIn, RefreshCw, AlertCircle, CheckCircle2, User } from 'lucide-react';
 import { getUsers } from '../services/api';
+import { formatDriveImageUrl } from '../utils/imageHelper';
 import MisterBLogo from './MisterBLogo';
 
 const normalizeNumber = (numStr) => {
@@ -61,6 +62,7 @@ const LoginAuth = ({ onUnlock }) => {
           const name = row[1] || 'User';
           const role = row[2] || 'Staff';
           const status = row[3] ? String(row[3]).trim().toLowerCase() : 'active';
+          const photo = formatDriveImageUrl(row[4] || '');
 
           if (sheetNum && (sheetNum === cleanInput || cleanInput.endsWith(sheetNum) || sheetNum.endsWith(cleanInput))) {
             if (status === 'inactive' || status === 'blocked') {
@@ -72,6 +74,7 @@ const LoginAuth = ({ onUnlock }) => {
               phone: row[0],
               name: name,
               role: role,
+              photo: photo,
               rowNumber: i + 1
             };
             break;
@@ -85,6 +88,7 @@ const LoginAuth = ({ onUnlock }) => {
           phone: cleanInput,
           name: 'Admin',
           role: 'Admin',
+          photo: '',
           rowNumber: 1
         };
       }
@@ -96,7 +100,7 @@ const LoginAuth = ({ onUnlock }) => {
 
         setTimeout(() => {
           onUnlock(matchedUser);
-        }, 500);
+        }, 700);
       } else {
         setErrorMsg('Invalid mobile number.');
       }
@@ -196,19 +200,35 @@ const LoginAuth = ({ onUnlock }) => {
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '12px',
                 padding: '10px 14px',
-                borderRadius: '10px',
+                borderRadius: '12px',
                 background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
                 color: 'var(--success)',
-                fontSize: '0.9rem',
-                fontWeight: '500',
+                fontSize: '0.95rem',
+                fontWeight: '600',
                 marginBottom: '18px',
                 justifyContent: 'center'
               }}>
-                <CheckCircle2 size={16} />
-                <span>Logging in...</span>
+                {successUser.photo ? (
+                  <img
+                    src={successUser.photo}
+                    alt={successUser.name}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid var(--success)',
+                      boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+                    }}
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
+                ) : (
+                  <CheckCircle2 size={20} />
+                )}
+                <span>Welcome, {successUser.name}!</span>
               </div>
             )}
 
