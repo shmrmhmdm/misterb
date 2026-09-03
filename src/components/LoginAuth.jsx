@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, ShieldCheck, LogIn, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Phone, LogIn, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getUsers } from '../services/api';
+import MisterBLogo from './MisterBLogo';
 
 const normalizeNumber = (numStr) => {
   if (!numStr) return '';
@@ -128,26 +129,17 @@ const LoginAuth = ({ onUnlock }) => {
         alignItems: 'center',
         textAlign: 'center'
       }}>
-        {/* App Logo */}
-        <div style={{
-          width: '72px',
-          height: '72px',
-          borderRadius: '22px',
-          background: 'var(--accent-gradient)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 10px 25px rgba(99, 102, 241, 0.4)',
-          marginBottom: '20px'
-        }}>
-          <ShieldCheck size={38} color="#ffffff" />
+        {/* Brand Logo */}
+        <div style={{ marginBottom: '16px' }}>
+          <MisterBLogo size={84} glow={true} />
         </div>
 
         <h1 style={{
-          fontSize: '1.8rem',
-          fontWeight: '700',
-          marginBottom: '28px',
-          background: 'var(--accent-gradient)',
+          fontSize: '1.85rem',
+          fontWeight: '800',
+          letterSpacing: '0.5px',
+          marginBottom: '26px',
+          background: 'linear-gradient(135deg, #ffffff 30%, #93c5fd 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
