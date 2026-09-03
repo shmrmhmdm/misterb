@@ -129,22 +129,10 @@ const LoginAuth = ({ onUnlock }) => {
         alignItems: 'center',
         textAlign: 'center'
       }}>
-        {/* Brand Logo */}
-        <div style={{ marginBottom: '16px' }}>
-          <MisterBLogo size={84} glow={true} />
+        {/* Royal Letters Mister B Brand */}
+        <div style={{ marginBottom: '24px' }}>
+          <MisterBLogo size="large" showSubtitle={false} />
         </div>
-
-        <h1 style={{
-          fontSize: '1.85rem',
-          fontWeight: '800',
-          letterSpacing: '0.5px',
-          marginBottom: '26px',
-          background: 'linear-gradient(135deg, #ffffff 30%, #93c5fd 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          Mister B
-        </h1>
 
         {/* Clean Login Card */}
         <div className="card" style={{
