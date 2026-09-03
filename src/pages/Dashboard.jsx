@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getSales, getExpenses, getLedger, getCollections, getShops, getProducts, getUsers } from '../services/api';
 import { formatDriveImageUrl } from '../utils/imageHelper';
+import UserAvatar from '../components/UserAvatar';
 import {
   ResponsiveContainer,
   BarChart,
@@ -742,37 +743,7 @@ const Dashboard = () => {
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {staff.photo ? (
-                              <img
-                                src={staff.photo}
-                                alt={staff.name}
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '50%',
-                                  objectFit: 'cover',
-                                  border: '2px solid var(--accent-primary)',
-                                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
-                                }}
-                                onError={(e) => e.target.style.display = 'none'}
-                              />
-                            ) : (
-                              <div style={{
-                                width: '42px',
-                                height: '42px',
-                                borderRadius: '12px',
-                                background: 'var(--accent-gradient)',
-                                color: '#fff',
-                                fontWeight: '700',
-                                fontSize: '1.1rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
-                              }}>
-                                {staff.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                            <UserAvatar photo={staff.photo} name={staff.name} size={42} />
                             <div>
                               <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{staff.name}</h4>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
@@ -1048,37 +1019,7 @@ const Dashboard = () => {
           <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {selectedStaffModal.photo ? (
-                  <img
-                    src={selectedStaffModal.photo}
-                    alt={selectedStaffModal.name}
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid #10b981',
-                      boxShadow: '0 0 12px rgba(16, 185, 129, 0.4)'
-                    }}
-                    onError={(e) => e.target.style.display = 'none'}
-                  />
-                ) : (
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'var(--accent-gradient)',
-                    color: '#fff',
-                    fontWeight: '700',
-                    fontSize: '1.2rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
-                  }}>
-                    {selectedStaffModal.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <UserAvatar photo={selectedStaffModal.photo} name={selectedStaffModal.name} size={48} />
                 <div>
                   <h2 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-primary)' }}>
                     {selectedStaffModal.name}
