@@ -207,12 +207,51 @@ function doPost(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "addUser") {
+    var usersSheet = sheet.getSheetByName("Users");
+    if (!usersSheet) {
+      usersSheet = sheet.insertSheet("Users");
+      usersSheet.appendRow(["Phone Number", "Name", "Role", "Status"]);
+    }
+    usersSheet.appendRow([params.data.phone, params.data.name, params.data.role || "Staff", params.data.status || "Active"]);
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "editUser") {
+    var usersSheet = sheet.getSheetByName("Users");
+    var rowIndex = params.rowIndex;
+    if (usersSheet && rowIndex) {
+      usersSheet.getRange(rowIndex, 1, 1, 4).setValues([[params.data.phone, params.data.name, params.data.role, params.data.status]]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "deleteUser") {
+    var usersSheet = sheet.getSheetByName("Users");
+    var rowIndex = params.rowIndex;
+    if (usersSheet && rowIndex) {
+      usersSheet.deleteRow(rowIndex);
+    }
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doGet(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet();
   var action = e.parameter.action;
+
+  if (action === "getUsers" || action === "getAuth") {
+    var usersSheet = sheet.getSheetByName("Users");
+    if (!usersSheet) {
+      usersSheet = sheet.insertSheet("Users");
+      usersSheet.appendRow(["Phone Number", "Name", "Role", "Status"]);
+      usersSheet.appendRow(["9876543210", "Admin", "Admin", "Active"]);
+    }
+    var data = usersSheet.getDataRange().getValues();
+    return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+  }
 
   if (action === "getSales") {
     var salesSheet = sheet.getSheetByName("Sales");

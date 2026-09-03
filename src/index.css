@@ -201,9 +201,61 @@ tr:hover {
   background-color: rgba(255, 255, 255, 0.03);
 }
 
+/* Responsive Layouts & Grids */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-grid-full {
+  grid-column: span 2;
+}
+
+.grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px 12px !important;
+  }
+
+  .card {
+    padding: 16px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .form-grid-full {
+    grid-column: span 1 !important;
+  }
+
+  .grid-responsive {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  h1 { font-size: 1.5rem !important; margin-bottom: 16px !important; }
+  h2 { font-size: 1.25rem !important; margin-bottom: 12px !important; }
+  h3 { font-size: 1.1rem !important; margin-bottom: 10px !important; }
+
+  th, td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+}
+
 /* Forms */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  min-width: 0;
 }
 
 .form-label {
@@ -214,19 +266,20 @@ tr:hover {
   margin-bottom: 8px;
 }
 
-.form-input {
+.form-input, input, select, textarea {
   width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   background-color: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   color: var(--text-primary);
   font-family: var(--font-family);
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: all var(--transition-fast);
 }
 
-.form-input:focus {
+.form-input:focus, input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);

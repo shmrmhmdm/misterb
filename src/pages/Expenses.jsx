@@ -28,7 +28,7 @@ const Expenses = () => {
     let parsedExpenses = [];
     if (data && data.length > 0) {
       const firstCell = String(data[0][0]).toLowerCase();
-      const hasHeader = (firstCell === 'date' || firstCell === 'തീയതി');
+      const hasHeader = (firstCell === 'date');
       const startIndex = hasHeader ? 1 : 0;
       
       for (let i = startIndex; i < data.length; i++) {
@@ -111,7 +111,7 @@ const Expenses = () => {
         </div>
         
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Date</label>
               <input type="date" name="date" className="form-input" value={formData.date} onChange={handleChange} required />
@@ -127,7 +127,7 @@ const Expenses = () => {
                 <option value="Other">Other</option>
               </select>
             </div>
-            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <div className="form-group form-grid-full">
               <label className="form-label">Description</label>
               <input type="text" name="description" className="form-input" value={formData.description} onChange={handleChange} required />
             </div>
@@ -144,7 +144,7 @@ const Expenses = () => {
               </select>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '16px' }}>
+          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '16px', width: '100%', padding: '12px 24px' }}>
             {submitting ? (editingRow ? 'Updating...' : 'Adding...') : (editingRow ? 'Update Expense' : 'Add Expense')}
           </button>
         </form>

@@ -17,7 +17,19 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { TrendingUp, PieChart as PieIcon, BarChart3, Calendar, Wallet } from 'lucide-react';
+import { 
+  TrendingUp, 
+  PieChart as PieIcon, 
+  BarChart3, 
+  Calendar, 
+  Wallet, 
+  Users, 
+  UserCheck, 
+  ShoppingBag, 
+  ArrowDownLeft, 
+  DollarSign, 
+  CheckCircle2 
+} from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
 
@@ -29,16 +41,16 @@ const CustomTooltip = ({ active, payload, label }) => {
         border: '1px solid rgba(255, 255, 255, 0.15)',
         borderRadius: '10px',
         padding: '10px 14px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(10px)',
-        fontSize: '0.85rem',
-        minWidth: '150px'
+        boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
       }}>
-        {label && <p style={{ margin: '0 0 6px 0', fontWeight: '700', color: '#f8fafc' }}>{label}</p>}
-        {payload.map((item, index) => (
-          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', margin: '4px 0', color: item.color || item.fill }}>
-            <span>{item.name}:</span>
-            <span style={{ fontWeight: '700' }}>₹{Number(item.value).toLocaleString()}</span>
+        <p style={{ margin: '0 0 6px 0', fontWeight: '600', color: 'var(--text-primary)', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+          {label}
+        </p>
+        {payload.map((entry, index) => (
+          <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', marginTop: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color || entry.fill }}></span>
+            <span style={{ color: 'var(--text-secondary)' }}>{entry.name}:</span>
+            <span style={{ fontWeight: '600', color: '#fff' }}>₹{Number(entry.value).toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -68,6 +80,7 @@ const Dashboard = () => {
   const [expenseDetails, setExpenseDetails] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [selectedStaffModal, setSelectedStaffModal] = useState(null);
 
   // Raw data from Google Sheets
   const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [], collections: [] });
@@ -116,21 +129,21 @@ const Dashboard = () => {
     let validSales = [];
     if (salesData && salesData.length > 0) {
       const firstCell = String(salesData[0][0]).toLowerCase();
-      if (firstCell === 'date' || firstCell === 'തീയതി') validSales = salesData.slice(1);
+      if (firstCell === 'date') validSales = salesData.slice(1);
       else validSales = salesData;
     }
 
     let validExpenses = [];
     if (expensesData && expensesData.length > 0) {
       const firstCell = String(expensesData[0][0]).toLowerCase();
-      if (firstCell === 'date' || firstCell === 'തീയതി') validExpenses = expensesData.slice(1);
+      if (firstCell === 'date') validExpenses = expensesData.slice(1);
       else validExpenses = expensesData;
     }
 
     let validCollections = [];
     if (collectionsData && collectionsData.length > 0) {
       const firstCell = String(collectionsData[0][0]).toLowerCase();
-      if (firstCell === 'date' || firstCell === 'തീയതി') validCollections = collectionsData.slice(1);
+      if (firstCell === 'date') validCollections = collectionsData.slice(1);
       else validCollections = collectionsData;
     }
 
@@ -336,6 +349,126 @@ const Dashboard = () => {
       }));
   }, [rawData]);
 
+  // Calculate Staff-wise Cash Breakdown (Sale by Cash + Collected by Cash)
+  const staffCashData = useMemo(() => {
+    if (!rawData) return { staffList: [], totalSaleCash: 0, totalDueColl: 0, grandTotal: 0 };
+    const { sales, collections } = rawData;
+
+    const isSameMonth = (dateString) => {
+      const d = parseDateStr(dateString);
+      if (!d) return false;
+      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return m === selectedMonth;
+    };
+
+    let validSales = [];
+    if (sales && sales.length > 0) {
+      const firstCell = String(sales[0][0]).toLowerCase();
+      validSales = (firstCell === 'date') ? sales.slice(1) : sales;
+    }
+
+    let validCollections = [];
+    if (collections && collections.length > 0) {
+      const firstCell = String(collections[0][0]).toLowerCase();
+      validCollections = (firstCell === 'date') ? collections.slice(1) : collections;
+    }
+
+    const staffMap = {};
+    let totalSaleCash = 0;
+    let totalDueColl = 0;
+
+    // 1. Process sales cash (Sale By -> row[5], Cash Received -> row[6])
+    validSales.forEach(row => {
+      if (isSameMonth(row[0])) {
+        const staffName = (row[5] || '').trim() || 'Unassigned';
+        const cash = Number(row[6]) || 0;
+        const price = Number(row[4]) || 0;
+        const shop = (row[1] || '').trim();
+        const date = row[0];
+
+        if (!staffMap[staffName]) {
+          staffMap[staffName] = {
+            name: staffName,
+            saleCash: 0,
+            dueCollections: 0,
+            totalCash: 0,
+            salesCount: 0,
+            collectionsCount: 0,
+            transactions: []
+          };
+        }
+
+        staffMap[staffName].saleCash += cash;
+        totalSaleCash += cash;
+        if (cash > 0) staffMap[staffName].salesCount += 1;
+
+        if (cash > 0) {
+          staffMap[staffName].transactions.push({
+            type: 'Sale Cash',
+            date: date,
+            shop: shop,
+            amount: cash,
+            item: row[2] || '',
+            notes: `Item: ${row[2] || '-'} (Total: ₹${price})`
+          });
+        }
+      }
+    });
+
+    // 2. Process due collections cash (Collected By -> row[4], Amount -> row[2])
+    validCollections.forEach(row => {
+      if (isSameMonth(row[0])) {
+        const staffName = (row[4] || '').trim() || 'Unassigned';
+        const amount = Number(row[2]) || 0;
+        const shop = (row[1] || '').trim();
+        const date = row[0];
+        const mode = row[3] || 'Cash';
+        const notes = row[5] || '';
+
+        if (!staffMap[staffName]) {
+          staffMap[staffName] = {
+            name: staffName,
+            saleCash: 0,
+            dueCollections: 0,
+            totalCash: 0,
+            salesCount: 0,
+            collectionsCount: 0,
+            transactions: []
+          };
+        }
+
+        staffMap[staffName].dueCollections += amount;
+        totalDueColl += amount;
+        if (amount > 0) staffMap[staffName].collectionsCount += 1;
+
+        if (amount > 0) {
+          staffMap[staffName].transactions.push({
+            type: 'Due Collection',
+            date: date,
+            shop: shop,
+            amount: amount,
+            mode: mode,
+            notes: notes || mode
+          });
+        }
+      }
+    });
+
+    const staffList = Object.values(staffMap).map(s => {
+      const totalCash = s.saleCash + s.dueCollections;
+      return {
+        ...s,
+        totalCash,
+        transactions: s.transactions.sort((a, b) => new Date(b.date) - new Date(a.date))
+      };
+    }).filter(s => s.totalCash > 0)
+      .sort((a, b) => b.totalCash - a.totalCash);
+
+    const grandTotal = totalSaleCash + totalDueColl;
+
+    return { staffList, totalSaleCash, totalDueColl, grandTotal };
+  }, [rawData, selectedMonth]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
@@ -398,8 +531,148 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* STAFF CASH IN HAND / COLLECTIONS BREAKDOWN SECTION */}
+          <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid #10b981', background: 'rgba(16, 185, 129, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+                  <Users size={22} color="#10b981" />
+                  Staff Cash in Hand & Collections
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                  Cash received during sales (Sale By) & due payments collected later (Collected By)
+                </p>
+              </div>
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '6px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Month Total:</span>
+                <strong style={{ color: '#10b981', fontSize: '1.15rem' }}>₹{staffCashData.grandTotal.toLocaleString()}</strong>
+              </div>
+            </div>
+
+            {staffCashData.staffList.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                No staff cash collections recorded for {selectedMonth}.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                {staffCashData.staffList.map((staff, idx) => {
+                  const percent = staffCashData.grandTotal > 0 ? ((staff.totalCash / staffCashData.grandTotal) * 100).toFixed(1) : 0;
+                  return (
+                    <div 
+                      key={idx}
+                      className="card"
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--glass-border)',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => setSelectedStaffModal(staff)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#10b981';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--glass-border)';
+                        e.currentTarget.style.transform = 'none';
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '10px',
+                              background: 'var(--accent-gradient)',
+                              color: '#fff',
+                              fontWeight: '700',
+                              fontSize: '1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
+                            }}>
+                              {staff.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{staff.name}</h4>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                {staff.transactions.length} total entries
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Cash in Hand</span>
+                            <strong style={{ fontSize: '1.25rem', color: '#10b981' }}>
+                              ₹{staff.totalCash.toLocaleString()}
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Breakdown Badges */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                          <div style={{
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            borderRadius: '8px',
+                            padding: '8px 10px'
+                          }}>
+                            <span style={{ fontSize: '0.75rem', color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <ShoppingBag size={12} /> Sale By
+                            </span>
+                            <strong style={{ fontSize: '0.95rem', color: '#60a5fa', display: 'block', marginTop: '2px' }}>
+                              ₹{staff.saleCash.toLocaleString()}
+                            </strong>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                              ({staff.salesCount} sales)
+                            </span>
+                          </div>
+
+                          <div style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            borderRadius: '8px',
+                            padding: '8px 10px'
+                          }}>
+                            <span style={{ fontSize: '0.75rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <ArrowDownLeft size={12} /> Collected By
+                            </span>
+                            <strong style={{ fontSize: '0.95rem', color: '#34d399', display: 'block', marginTop: '2px' }}>
+                              ₹{staff.dueCollections.toLocaleString()}
+                            </strong>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                              ({staff.collectionsCount} collections)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Percentage Bar */}
+                        <div style={{ background: 'rgba(255, 255, 255, 0.06)', borderRadius: '4px', height: '6px', overflow: 'hidden', marginBottom: '10px' }}>
+                          <div style={{ background: 'var(--accent-gradient)', height: '100%', width: `${Math.min(percent, 100)}%` }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: '4px' }}>
+                        <span>{percent}% of Cash Inflow</span>
+                        <span style={{ color: 'var(--accent-primary)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          View Details →
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* CHARTS ROW 1 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
             {/* Daily Sales & Received Trend */}
             <div className="card" style={{ minHeight: '340px' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
@@ -429,7 +702,7 @@ const Dashboard = () => {
             {/* Category Expenses Breakdown */}
             <div className="card" style={{ minHeight: '340px' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
-                <PieIcon size={20} color="#ef4444" /> Expense Breakdown (ചെലവുകൾ)
+                <PieIcon size={20} color="#ef4444" /> Expense Breakdown
               </h3>
               {categoryChartData.length === 0 ? (
                 <div style={{ height: '240px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
@@ -470,7 +743,7 @@ const Dashboard = () => {
           {multiMonthData.length > 1 && (
             <div className="card" style={{ marginBottom: '24px' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '1.1rem' }}>
-                <TrendingUp size={20} color="#10b981" /> Monthly Overview & Trends (മാസാമാസമുള്ള കണക്ക്)
+                <TrendingUp size={20} color="#10b981" /> Monthly Overview & Trends
               </h3>
               <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -581,6 +854,123 @@ const Dashboard = () => {
                   {expenseDetails.length === 0 && (
                     <tr>
                       <td colSpan="2" style={{textAlign: 'center'}}>No expenses recorded this month.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Staff Cash Breakdown & Transaction History */}
+      {selectedStaffModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', 
+          zIndex: 1000, padding: '16px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.3rem' }}>
+                  <Users size={22} color="#10b981" />
+                  {selectedStaffModal.name}
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Cash in hand & collection breakdown for {selectedMonth}
+                </span>
+              </div>
+              <button 
+                onClick={() => setSelectedStaffModal(null)} 
+                style={{ background: 'none', border: 'none', fontSize: '1.8rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Metric Summary inside Modal */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '10px 12px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ShoppingBag size={12} /> Sale By Cash
+                </span>
+                <strong style={{ display: 'block', fontSize: '1.2rem', color: '#60a5fa', marginTop: '2px' }}>
+                  ₹{selectedStaffModal.saleCash.toLocaleString()}
+                </strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  {selectedStaffModal.salesCount} sales
+                </span>
+              </div>
+
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '10px 12px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ArrowDownLeft size={12} /> Collected By
+                </span>
+                <strong style={{ display: 'block', fontSize: '1.2rem', color: '#34d399', marginTop: '2px' }}>
+                  ₹{selectedStaffModal.dueCollections.toLocaleString()}
+                </strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  {selectedStaffModal.collectionsCount} collections
+                </span>
+              </div>
+
+              <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '10px 12px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#c4b5fd', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Wallet size={12} /> Total Cash in Hand
+                </span>
+                <strong style={{ display: 'block', fontSize: '1.2rem', color: '#a78bfa', marginTop: '2px' }}>
+                  ₹{selectedStaffModal.totalCash.toLocaleString()}
+                </strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  Total Collected
+                </span>
+              </div>
+            </div>
+
+            {/* Transactions Table */}
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: 'var(--text-primary)' }}>
+              Detailed Transactions ({selectedStaffModal.transactions.length})
+            </h4>
+            
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Shop</th>
+                    <th>Amount</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedStaffModal.transactions.map((tx, idx) => (
+                    <tr key={idx}>
+                      <td>{tx.date ? new Date(tx.date).toLocaleDateString('en-GB') : '-'}</td>
+                      <td>
+                        <span className="badge" style={{
+                          background: tx.type === 'Sale Cash' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                          color: tx.type === 'Sale Cash' ? '#60a5fa' : '#34d399'
+                        }}>
+                          {tx.type}
+                        </span>
+                      </td>
+                      <td><strong>{tx.shop || '-'}</strong></td>
+                      <td style={{ fontWeight: '700', color: '#10b981' }}>
+                        ₹{tx.amount.toLocaleString()}
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {tx.notes || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                  {selectedStaffModal.transactions.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                        No transactions recorded.
+                      </td>
                     </tr>
                   )}
                 </tbody>

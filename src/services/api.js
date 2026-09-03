@@ -300,3 +300,64 @@ export const getCollections = async () => {
   }
 };
 
+export const getUsers = async () => {
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=getUsers&t=${new Date().getTime()}`);
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      localStorage.setItem('misterb_cached_users', JSON.stringify(data));
+    }
+    return data;
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    const cached = localStorage.getItem('misterb_cached_users');
+    return cached ? JSON.parse(cached) : [];
+  }
+};
+
+export const addUser = async (data) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addUser', data }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error adding user:', error);
+    throw error;
+  }
+};
+
+export const editUser = async (rowIndex, data) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'editUser', rowIndex, data }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error editing user:', error);
+    throw error;
+  }
+};
+
+export const deleteUser = async (rowIndex) => {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteUser', rowIndex }),
+    });
+    return { status: 'success' };
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+};
+
+

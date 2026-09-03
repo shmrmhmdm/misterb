@@ -45,7 +45,7 @@ const PinLock = ({ onUnlock }) => {
       }, 200);
     } else {
       setError(true);
-      setErrorMessage('തെറ്റായ പിൻ! വീണ്ടും ശ്രമിക്കുക.');
+      setErrorMessage('Incorrect PIN! Please try again.');
       setShake(true);
       setTimeout(() => {
         setShake(false);
@@ -117,7 +117,7 @@ const PinLock = ({ onUnlock }) => {
           Mister B
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '28px' }}>
-          സുരക്ഷാ പിൻ നൽകുക (Enter 4-Digit PIN)
+          Enter 4-Digit PIN
         </p>
 
         {/* 4 Pin Indicator Dots */}

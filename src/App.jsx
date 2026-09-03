@@ -9,9 +9,9 @@ import Dashboard from './pages/Dashboard';
 import Ledger from './pages/Ledger';
 import Expenses from './pages/Expenses';
 import Reports from './pages/Reports';
-import PinLock from './components/PinLock';
+import LoginAuth from './components/LoginAuth';
 
-const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
+const Sidebar = ({ isOpen, toggleSidebar, onLock, currentUser }) => {
   const location = useLocation();
   
   const navItems = [
@@ -29,9 +29,16 @@ const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
       <div className={`sidebar ${isOpen ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div>
           <div style={{ padding: '0 24px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Mister B
-            </h1>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Mister B
+              </h1>
+              {currentUser?.name && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  👤 {currentUser.name} ({currentUser.role || 'Staff'})
+                </div>
+              )}
+            </div>
             <button className="menu-toggle btn" onClick={toggleSidebar} style={{ padding: '4px', background: 'transparent' }}>
               <X size={24} color="var(--text-primary)" />
             </button>
@@ -77,7 +84,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLock }) => {
             }}
           >
             <Lock size={18} />
-            <span>Lock App (ലോക്ക്)</span>
+            <span>Logout / പുറത്തുകടക്കുക</span>
           </button>
         </div>
       </div>
@@ -95,26 +102,40 @@ const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('misterb_auth') === 'true';
   });
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('misterb_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  const handleUnlock = () => {
+  const handleUnlock = (userData) => {
     sessionStorage.setItem('misterb_auth', 'true');
+    if (userData) {
+      setCurrentUser(userData);
+      sessionStorage.setItem('misterb_user', JSON.stringify(userData));
+    }
     setIsAuthenticated(true);
   };
 
   const handleLock = () => {
     sessionStorage.removeItem('misterb_auth');
+    sessionStorage.removeItem('misterb_user');
     setIsAuthenticated(false);
+    setCurrentUser(null);
     setSidebarOpen(false);
   };
 
   if (!isAuthenticated) {
-    return <PinLock onUnlock={handleUnlock} />;
+    return <LoginAuth onUnlock={handleUnlock} />;
   }
 
   return (
     <Router>
       <div className="app-container">
-        <Sidebar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(false)} onLock={handleLock} />
+        <Sidebar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(false)} onLock={handleLock} currentUser={currentUser} />
         
         <main className="main-content">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
@@ -124,17 +145,24 @@ const App = () => {
                   <Menu size={24} color="var(--text-primary)" />
                 </button>
               </div>
-              <h2 style={{ margin: 0 }}>Mister B App</h2>
+              <div>
+                <h2 style={{ margin: 0 }}>Mister B App</h2>
+                {currentUser?.name && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: '600' }}>
+                    👋 {currentUser.name}
+                  </span>
+                )}
+              </div>
             </div>
 
             <button 
               onClick={handleLock}
               className="btn" 
               style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', padding: '8px 14px', fontSize: '0.85rem' }}
-              title="Lock Application"
+              title="Logout / Lock Application"
             >
               <Lock size={16} />
-              <span>Lock</span>
+              <span>Logout</span>
             </button>
           </div>
           

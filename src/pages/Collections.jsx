@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getCollections, addCollection, editCollection, deleteCollection, getShops, getSales } from '../services/api';
+import SearchableSelect from '../components/SearchableSelect';
 import { 
   Wallet, 
   Calendar, 
@@ -58,7 +59,7 @@ const Collections = () => {
     let parsedCollections = [];
     if (collData && collData.length > 0) {
       const firstCell = String(collData[0][0]).toLowerCase();
-      const hasHeader = (firstCell === 'date' || firstCell === 'തീയതി');
+      const hasHeader = (firstCell === 'date');
       const startIndex = hasHeader ? 1 : 0;
 
       for (let i = startIndex; i < collData.length; i++) {
@@ -83,7 +84,7 @@ const Collections = () => {
     let validSales = [];
     if (salesData && salesData.length > 0) {
       const firstCell = String(salesData[0][0]).toLowerCase();
-      validSales = (firstCell === 'date' || firstCell === 'തീയതി') ? salesData.slice(1) : salesData;
+      validSales = (firstCell === 'date') ? salesData.slice(1) : salesData;
     }
     setSalesList(validSales);
 
@@ -254,10 +255,10 @@ const Collections = () => {
         <div>
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Wallet color="var(--accent-color)" size={28} />
-            Due Collections (കുടിശ്ശിക കളക്ഷൻ)
+            Due Collections
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '0.95rem' }}>
-            ഷോപ്പുകളിൽ നിന്ന് പിന്നീട് ലഭിക്കുന്ന കുടിശ്ശിക തുകകൾ രേഖപ്പെടുത്തുക
+            Record and manage due payment collections from shops
           </p>
         </div>
       </div>
@@ -269,7 +270,7 @@ const Collections = () => {
             <TrendingUp size={28} />
           </div>
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Today's Collections (ഇന്ന് ലഭിച്ചത്)</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Today's Collections</span>
             <h3 style={{ margin: '4px 0 0 0', fontSize: '1.4rem', color: '#10b981' }}>
               ₹{summaryMetrics.todayTotal.toLocaleString()}
             </h3>
@@ -295,7 +296,7 @@ const Collections = () => {
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Entries This Month</span>
             <h3 style={{ margin: '4px 0 0 0', fontSize: '1.4rem', color: '#8b5cf6' }}>
-              {summaryMetrics.countMonth} രസീതുകൾ
+              {summaryMetrics.countMonth} Receipts
             </h3>
           </div>
         </div>
@@ -325,7 +326,7 @@ const Collections = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             {editingRow ? <Edit2 size={20} color="var(--warning)" /> : <PlusCircle size={20} color="var(--accent-color)" />}
-            {editingRow ? `Edit Collection Entry (വരി #${editingRow})` : 'New Due Collection Entry (കളക്ഷൻ ചേർക്കുക)'}
+            {editingRow ? `Edit Collection Entry (Row #${editingRow})` : 'New Due Collection Entry'}
           </h3>
           {editingRow && (
             <button className="btn" onClick={cancelEdit} style={{ background: 'var(--glass-bg)', fontSize: '0.85rem', padding: '6px 12px' }}>
@@ -341,7 +342,7 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                തീയതി (Date)
+                Date
               </label>
               <input 
                 type="date" 
@@ -356,31 +357,30 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <Store size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                ഷോപ്പ് (Shop Name)
+                Shop Name
               </label>
-              <select 
-                name="shop" 
-                value={formData.shop} 
-                onChange={handleShopSelect} 
-                required
-              >
-                <option value="">-- ഷോപ്പ് തിരഞ്ഞെടുക്കുക --</option>
-                {shopsList.map((shop, idx) => {
+              <SearchableSelect
+                name="shop"
+                options={shopsList.map((shop) => {
                   const sName = shop[0];
                   const due = shopOutstandingMap[sName] || 0;
-                  return (
-                    <option key={idx} value={sName}>
-                      {sName} {due > 0 ? `(ബാക്കി: ₹${due.toLocaleString()})` : (due < 0 ? `(Advance: ₹${Math.abs(due)})` : '(No Due)')}
-                    </option>
-                  );
+                  return {
+                    value: sName,
+                    label: `${sName} ${due > 0 ? `(Due: ₹${due.toLocaleString()})` : (due < 0 ? `(Advance: ₹${Math.abs(due)})` : '(No Due)')}`
+                  };
                 })}
-              </select>
+                value={formData.shop}
+                onChange={handleShopSelect}
+                placeholder="-- Select Shop --"
+                searchPlaceholder="Search shop name or due..."
+                required
+              />
             </div>
 
             {/* Amount Field */}
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ margin: 0 }}>ലഭിച്ച തുക (Amount ₹)</label>
+                <label style={{ margin: 0 }}>Amount Received (₹)</label>
                 {formData.shop && selectedShopOutstanding > 0 && (
                   <button 
                     type="button" 
@@ -415,17 +415,17 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <CreditCard size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                പേയ്‌മെന്റ് രീതി (Payment Mode)
+                Payment Mode
               </label>
               <select 
                 name="paymentMode" 
                 value={formData.paymentMode} 
                 onChange={handleChange}
               >
-                <option value="Cash">Cash (പണം)</option>
+                <option value="Cash">Cash</option>
                 <option value="GPay / UPI">Google Pay / PhonePe / UPI</option>
                 <option value="Bank Transfer">Bank Transfer (NEFT/IMPS)</option>
-                <option value="Cheque">Cheque (ചെക്ക്)</option>
+                <option value="Cheque">Cheque</option>
                 <option value="Other">Other</option>
               </select>
             </div>
@@ -434,7 +434,7 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <User size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                കളക്റ്റ് ചെയ്ത ആൾ (Collected By)
+                Collected By
               </label>
               <input 
                 type="text" 
@@ -449,7 +449,7 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <FileText size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                കുറിപ്പ് / ബിൽ നമ്പർ (Notes / Remarks)
+                Notes / Remarks
               </label>
               <input 
                 type="text" 
@@ -476,7 +476,7 @@ const Collections = () => {
               fontSize: '0.9rem'
             }}>
               <span>
-                <strong>{formData.shop}</strong> - നിലവിലെ കുടിശ്ശിക (Current Outstanding):
+                <strong>{formData.shop}</strong> - Current Outstanding:
               </span>
               <strong style={{ fontSize: '1.05rem', color: selectedShopOutstanding > 0 ? '#ef4444' : '#10b981' }}>
                 ₹{selectedShopOutstanding.toLocaleString()}
@@ -491,7 +491,7 @@ const Collections = () => {
               disabled={submitting}
               style={{ flex: 1, padding: '12px 20px', fontSize: '1rem' }}
             >
-              {submitting ? 'Saving Data...' : (editingRow ? 'Update Collection (തിരുത്തുക)' : 'Save Collection (കളക്ഷൻ രേഖപ്പെടുത്തുക)')}
+              {submitting ? 'Saving Data...' : (editingRow ? 'Update Collection' : 'Save Collection')}
             </button>
             {editingRow && (
               <button 
@@ -512,7 +512,7 @@ const Collections = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ArrowDownLeft size={20} color="#10b981" />
-            Collection History (കളക്ഷൻ വിവരങ്ങൾ)
+            Collection History
           </h3>
 
           {/* Search and Filters */}

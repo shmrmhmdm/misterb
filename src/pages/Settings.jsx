@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { getShops, getProducts, addShop, editShop, deleteShop, addProduct, editProduct, deleteProduct, deleteMonthData } from '../services/api';
+import { getShops, getProducts, addShop, editShop, deleteShop, addProduct, editProduct, deleteProduct, deleteMonthData, getUsers, addUser, editUser, deleteUser } from '../services/api';
+import { ShieldCheck, UserPlus, Phone, Trash2, Edit2, RefreshCw } from 'lucide-react';
 
 const Settings = () => {
   const [shops, setShops] = useState([]);
   const [products, setProducts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // User Management State
+  const [userPhone, setUserPhone] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('Staff');
+  const [userStatus, setUserStatus] = useState('Active');
+  const [userSubmitting, setUserSubmitting] = useState(false);
+  const [editingUserRow, setEditingUserRow] = useState(null);
+  const [userFeedback, setUserFeedback] = useState('');
+
   const [shopName, setShopName] = useState('');
   const [shopDetails, setShopDetails] = useState('');
   const [shopSubmitting, setShopSubmitting] = useState(false);
@@ -31,7 +42,7 @@ const Settings = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [shopsData, productsData] = await Promise.all([getShops(), getProducts()]);
+    const [shopsData, productsData, usersData] = await Promise.all([getShops(), getProducts(), getUsers()]);
     
     // Process shops
     let parsedShops = [];
@@ -62,8 +73,73 @@ const Settings = () => {
       }
     }
     setProducts(parsedProducts);
+
+    // Process users
+    let parsedUsers = [];
+    if (usersData && usersData.length > 0) {
+      const firstCell = String(usersData[0][0]).toLowerCase();
+      const hasHeader = firstCell.includes('phone') || firstCell.includes('mobile') || firstCell.includes('number');
+      const startIndex = hasHeader ? 1 : 0;
+      for (let i = startIndex; i < usersData.length; i++) {
+        parsedUsers.push({
+          rowNumber: i + 1,
+          data: usersData[i]
+        });
+      }
+    }
+    setUsers(parsedUsers);
     
     setLoading(false);
+  };
+
+  // --- USER HANDLERS ---
+  const handleEditUserClick = (uObj) => {
+    setUserPhone(uObj.data[0] || '');
+    setUserName(uObj.data[1] || '');
+    setUserRole(uObj.data[2] || 'Staff');
+    setUserStatus(uObj.data[3] || 'Active');
+    setEditingUserRow(uObj.rowNumber);
+  };
+
+  const cancelEditUser = () => {
+    setUserPhone('');
+    setUserName('');
+    setUserRole('Staff');
+    setUserStatus('Active');
+    setEditingUserRow(null);
+  };
+
+  const handleDeleteUser = async (rowIndex) => {
+    if (window.confirm("Are you sure you want to remove this authorized number?")) {
+      try {
+        await deleteUser(rowIndex);
+        if (editingUserRow === rowIndex) cancelEditUser();
+        setUserFeedback('✅ Number deleted successfully!');
+        setTimeout(fetchData, 1000);
+      } catch (error) {
+        setUserFeedback('❌ Error deleting number');
+      }
+    }
+  };
+
+  const handleUserSubmit = async (e) => {
+    e.preventDefault();
+    setUserSubmitting(true);
+    setUserFeedback('');
+    try {
+      if (editingUserRow) {
+        await editUser(editingUserRow, { phone: userPhone, name: userName, role: userRole, status: userStatus });
+        setUserFeedback('✅ Authorized number updated successfully!');
+      } else {
+        await addUser({ phone: userPhone, name: userName, role: userRole, status: userStatus });
+        setUserFeedback('✅ Authorized number added successfully!');
+      }
+      cancelEditUser();
+      setTimeout(fetchData, 1000);
+    } catch (error) {
+      setUserFeedback('❌ Error saving user number');
+    }
+    setUserSubmitting(false);
   };
 
   // --- SHOP HANDLERS ---
@@ -187,22 +263,22 @@ const Settings = () => {
     const savedPin = localStorage.getItem('misterb_pin') || '1234';
 
     if (currentPin !== savedPin) {
-      setPinFeedback('❌ നിലവിലെ പിൻ (Current PIN) തെറ്റാണ്!');
+      setPinFeedback('❌ Current PIN is incorrect!');
       return;
     }
 
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      setPinFeedback('❌ പുതിയ പിൻ കൃത്യം 4 അക്കങ്ങൾ (digits) ആയിരിക്കണം!');
+      setPinFeedback('❌ New PIN must be exactly 4 digits!');
       return;
     }
 
     if (newPin !== confirmNewPin) {
-      setPinFeedback('❌ പുതിയ പിൻ കൺഫേം ചെയ്തതുമായി ഒത്തുപോകുന്നില്ല!');
+      setPinFeedback('❌ New PIN and Confirm PIN do not match!');
       return;
     }
 
     localStorage.setItem('misterb_pin', newPin);
-    setPinFeedback('✅ സുരക്ഷാ പിൻ വിജയകരമായി മാറ്റി!');
+    setPinFeedback('✅ Security PIN updated successfully!');
     setCurrentPin('');
     setNewPin('');
     setConfirmNewPin('');
@@ -212,88 +288,194 @@ const Settings = () => {
     <div>
       <h1>Settings / Master Data</h1>
 
-      {/* Security: Change App PIN */}
+      {/* Security: Google Sheet Authorized Phone Numbers */}
       <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid var(--accent-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
-        <h3 style={{ color: 'var(--accent-primary)', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🔒 Change Security PIN (സുരക്ഷാ പിൻ മാറ്റുക)
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 style={{ color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={22} />
+            <span>🔐 Authorized Login Numbers (Google Sheets)</span>
+          </h3>
+          <button 
+            type="button" 
+            onClick={fetchData} 
+            className="btn" 
+            style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--glass-bg)' }}
+            title="Refresh Users from Google Sheet"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Sync</span>
+          </button>
+        </div>
+
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-          ആപ്പ് തുറക്കുമ്പോൾ ചോദിക്കുന്ന 4-അക്ക സുരക്ഷാ പിൻ മാറ്റാൻ താഴെ വിവരങ്ങൾ നൽകുക.
+          ഗൂഗിൾ ഷീറ്റിലെ <strong>Users</strong> ടാബിലുള്ള നമ്പറുകൾ ഉപയോഗിച്ച് ആപ്പിലേക്ക് ലോഗിൻ ചെയ്യാം. പുതിയ നമ്പറുകൾ ഇവിടെ ആഡ് ചെയ്യുകയോ ഗൂഗിൾ ഷീറ്റിൽ നേരിട്ട് ചേർക്കുകയോ ചെയ്യാം.
         </p>
 
-        <form onSubmit={handleChangePin}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end' }}>
+        {/* Add / Edit User Form */}
+        <form onSubmit={handleUserSubmit} style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', alignItems: 'end' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Current PIN (നിലവിലെ പിൻ)</label>
+              <label className="form-label" style={{ fontWeight: '600' }}>Mobile Number *</label>
               <input 
-                type="password" 
-                maxLength={4}
+                type="tel" 
                 className="form-input" 
-                placeholder="****"
-                value={currentPin} 
-                onChange={(e) => setCurrentPin(e.target.value)} 
+                placeholder="e.g. 9876543210"
+                value={userPhone} 
+                onChange={(e) => setUserPhone(e.target.value)} 
                 required 
               />
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">New 4-Digit PIN (പുതിയ പിൻ)</label>
+              <label className="form-label" style={{ fontWeight: '600' }}>User / Staff Name</label>
               <input 
-                type="password" 
-                maxLength={4}
+                type="text" 
                 className="form-input" 
-                placeholder="****"
-                value={newPin} 
-                onChange={(e) => setNewPin(e.target.value)} 
+                placeholder="e.g. Rahul / Admin"
+                value={userName} 
+                onChange={(e) => setUserName(e.target.value)} 
                 required 
               />
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Confirm New PIN</label>
-              <input 
-                type="password" 
-                maxLength={4}
-                className="form-input" 
-                placeholder="****"
-                value={confirmNewPin} 
-                onChange={(e) => setConfirmNewPin(e.target.value)} 
-                required 
-              />
+              <label className="form-label" style={{ fontWeight: '600' }}>Role</label>
+              <select 
+                className="form-input"
+                value={userRole}
+                onChange={(e) => setUserRole(e.target.value)}
+              >
+                <option value="Admin">Admin</option>
+                <option value="Staff">Staff</option>
+                <option value="Salesman">Salesman</option>
+                <option value="Manager">Manager</option>
+              </select>
             </div>
 
-            <div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontWeight: '600' }}>Status</label>
+              <select 
+                className="form-input"
+                value={userStatus}
+                onChange={(e) => setUserStatus(e.target.value)}
+              >
+                <option value="Active">Active (അനുവദിച്ചത്)</option>
+                <option value="Inactive">Inactive (ബ്ലോക്ക്)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                style={{ width: '100%', padding: '10px 16px' }}
+                style={{ flex: 1, padding: '10px 16px' }}
+                disabled={userSubmitting}
               >
-                Update PIN
+                {userSubmitting ? 'Saving...' : (editingUserRow ? 'Update' : '+ Add Number')}
               </button>
+              {editingUserRow && (
+                <button 
+                  type="button" 
+                  onClick={cancelEditUser} 
+                  className="btn" 
+                  style={{ background: 'var(--danger)', padding: '10px 12px' }}
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
 
-          {pinFeedback && (
-            <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: '8px', background: pinFeedback.startsWith('✅') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: pinFeedback.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
-              {pinFeedback}
+          {userFeedback && (
+            <div style={{ marginTop: '14px', padding: '10px 14px', borderRadius: '8px', background: userFeedback.startsWith('✅') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: userFeedback.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
+              {userFeedback}
             </div>
           )}
         </form>
+
+        {/* Existing Users Table */}
+        <div style={{ marginTop: '16px' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+            📋 നിലവിലുള്ള നമ്പറുകൾ (Authorized Numbers):
+          </h4>
+          {loading ? (
+            <p style={{ color: 'var(--text-secondary)' }}>Loading authorized users...</p>
+          ) : (
+            <div className="table-container" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mobile Number</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: '600', color: 'var(--accent-primary)' }}>{u.data[0]}</td>
+                      <td>{u.data[1] || '-'}</td>
+                      <td>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          background: u.data[2] === 'Admin' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                          color: u.data[2] === 'Admin' ? 'var(--accent-primary)' : 'var(--text-primary)'
+                        }}>
+                          {u.data[2] || 'Staff'}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          background: String(u.data[3]).toLowerCase() === 'inactive' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                          color: String(u.data[3]).toLowerCase() === 'inactive' ? 'var(--danger)' : 'var(--success)'
+                        }}>
+                          {u.data[3] || 'Active'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleEditUserClick(u)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Edit</button>
+                          <button onClick={() => handleDeleteUser(u.rowNumber)} className="btn" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--danger)' }}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No authorized numbers found. Add a number above or in the Google Sheet 'Users' tab.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Month Data Management / Bulk Delete */}
       <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid var(--danger)', background: 'rgba(239, 68, 68, 0.05)' }}>
         <h3 style={{ color: 'var(--danger)', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🗑️ Delete Monthly Entries (മാസത്തെ വിവരങ്ങൾ ക്ലിയർ ചെയ്യുക)
+          🗑️ Delete Monthly Entries
         </h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-          ഒരു നിർദ്ദിഷ്ട മാസത്തെ Sales അല്ലെങ്കിൽ Expenses വിവരങ്ങൾ ഒറ്റയടിക്ക് ഡിലീറ്റ് ചെയ്യാൻ താഴെ മാസം തിരഞ്ഞെടുക്കുക.
+          Select a month below to bulk delete sales, collections, or expenses data.
         </p>
 
         <form onSubmit={handleDeleteMonthData}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', alignItems: 'end' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontWeight: '600' }}>Select Month (മാസം)</label>
+              <label className="form-label" style={{ fontWeight: '600' }}>Select Month</label>
               <input 
                 type="month" 
                 className="form-input" 
@@ -304,7 +486,7 @@ const Settings = () => {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontWeight: '600' }}>What to Delete (എന്താണ് ഡിലീറ്റ് ചെയ്യേണ്ടത്)</label>
+              <label className="form-label" style={{ fontWeight: '600' }}>What to Delete</label>
               <select 
                 className="form-input" 
                 value={deleteType} 

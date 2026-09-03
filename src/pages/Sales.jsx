@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSales, addSale, editSale, deleteSale, getShops, getProducts } from '../services/api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -35,7 +36,7 @@ const Sales = () => {
     let parsedSales = [];
     if (salesData && salesData.length > 0) {
       const firstCell = String(salesData[0][0]).toLowerCase();
-      const hasHeader = (firstCell === 'date' || firstCell === 'തീയതി');
+      const hasHeader = (firstCell === 'date');
       const startIndex = hasHeader ? 1 : 0;
       
       for (let i = startIndex; i < salesData.length; i++) {
@@ -156,7 +157,7 @@ const Sales = () => {
           {editingRow && <button type="button" onClick={cancelEdit} className="btn" style={{background:'var(--danger)'}}>Cancel Edit</button>}
         </div>
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Date</label>
               <input type="date" name="date" className="form-input" value={formData.date} onChange={handleChange} required />
@@ -164,12 +165,15 @@ const Sales = () => {
             
             <div className="form-group">
               <label className="form-label">Shop Name</label>
-              <select name="shop" className="form-input" value={formData.shop} onChange={handleChange} required>
-                <option value="">-- Select Shop --</option>
-                {shopsList.map((s, i) => (
-                  <option key={i} value={s[0]}>{s[0]}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                name="shop"
+                options={shopsList.map((s) => ({ value: s[0], label: s[0] }))}
+                value={formData.shop}
+                onChange={handleChange}
+                placeholder="-- Select Shop --"
+                searchPlaceholder="Search shop..."
+                required
+              />
             </div>
             
             <div className="form-group">
@@ -197,12 +201,12 @@ const Sales = () => {
               <input type="number" name="cashReceived" className="form-input" value={formData.cashReceived} onChange={handleChange} required />
             </div>
             
-            <div className="form-group">
+            <div className="form-group form-grid-full">
               <label className="form-label">Sale By</label>
               <input type="text" name="saleBy" className="form-input" value={formData.saleBy} onChange={handleChange} required />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
+          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '8px', padding: '12px 24px', width: '100%' }}>
             {submitting ? (editingRow ? 'Updating...' : 'Adding...') : (editingRow ? 'Update Sale' : 'Add Sale')}
           </button>
         </form>

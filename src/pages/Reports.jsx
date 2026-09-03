@@ -59,7 +59,7 @@ const Reports = () => {
     let validSales = [];
     if (salesData && salesData.length > 0) {
       const firstCell = String(salesData[0][0]).toLowerCase();
-      validSales = (firstCell === 'date' || firstCell === 'തീയതി') ? salesData.slice(1) : salesData;
+      validSales = (firstCell === 'date') ? salesData.slice(1) : salesData;
     }
     setSales(validSales);
 
@@ -67,7 +67,7 @@ const Reports = () => {
     let validExpenses = [];
     if (expensesData && expensesData.length > 0) {
       const firstCell = String(expensesData[0][0]).toLowerCase();
-      validExpenses = (firstCell === 'date' || firstCell === 'തീയതി') ? expensesData.slice(1) : expensesData;
+      validExpenses = (firstCell === 'date') ? expensesData.slice(1) : expensesData;
     }
     setExpenses(validExpenses);
 
@@ -75,7 +75,7 @@ const Reports = () => {
     let validCollections = [];
     if (collectionsData && collectionsData.length > 0) {
       const firstCell = String(collectionsData[0][0]).toLowerCase();
-      validCollections = (firstCell === 'date' || firstCell === 'തീയതി') ? collectionsData.slice(1) : collectionsData;
+      validCollections = (firstCell === 'date') ? collectionsData.slice(1) : collectionsData;
     }
     setCollections(validCollections);
 
@@ -337,7 +337,7 @@ const Reports = () => {
         <div>
           <h1 style={{ margin: 0 }}>Reports & Statements</h1>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '0.95rem' }}>
-            വിൽപ്പന, ചെലവ്, കടകളുടെ സ്റ്റേറ്റ്മെന്റ് എന്നിവ പരിശോധിക്കുക & ഡൗൺലോഡ് ചെയ്യുക
+            View and download sales, expenses, and shop ledger statements
           </p>
         </div>
 
@@ -462,14 +462,14 @@ const Reports = () => {
               {/* Financial KPI Summary Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                 <div className="card" style={{ borderLeft: '4px solid #3b82f6' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Sales (വിൽപ്പന)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Sales</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: '#3b82f6' }}>
                     ₹{summaryTotals.totalSales.toLocaleString()}
                   </p>
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #10b981' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Cash Inflow (ലഭിച്ചത്)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Cash Inflow</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: '#10b981' }}>
                     ₹{summaryTotals.totalReceived.toLocaleString()}
                   </p>
@@ -479,14 +479,14 @@ const Reports = () => {
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #ef4444' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Expenses (ചെലവ്)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Expenses</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: '#ef4444' }}>
                     ₹{summaryTotals.totalExpenses.toLocaleString()}
                   </p>
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #6366f1' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Net Cash Flow (ലാഭം/ബാക്കി)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Net Cash Flow</span>
                   <p style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: '6px 0 0 0', color: summaryTotals.netCash >= 0 ? '#10b981' : '#ef4444' }}>
                     ₹{summaryTotals.netCash.toLocaleString()}
                   </p>
@@ -581,7 +581,7 @@ const Reports = () => {
             <div>
               <div className="card" style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                  <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Select Shop (കട തിരഞ്ഞെടുക്കുക):</label>
+                  <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Select Shop:</label>
                   <select 
                     className="form-input" 
                     style={{ width: 'auto', minWidth: '250px' }}
@@ -612,7 +612,7 @@ const Reports = () => {
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.08)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Current All-Time Outstanding (ആകെ ബാക്കി)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Current All-Time Outstanding</span>
                   <p style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: '4px 0 0 0', color: shopStatementData.currentOutstanding > 0 ? 'var(--danger)' : 'var(--success)' }}>
                     ₹{shopStatementData.currentOutstanding.toLocaleString()}
                   </p>
@@ -728,7 +728,7 @@ const Reports = () => {
             <div>
               <div className="card" style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                  <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Filter Category (വിഭാഗം):</label>
+                  <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Filter Category:</label>
                   <select 
                     className="form-input" 
                     style={{ width: 'auto', minWidth: '200px' }}

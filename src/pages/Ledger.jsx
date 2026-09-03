@@ -47,7 +47,7 @@ const Ledger = () => {
     let validSales = [];
     if (salesData && salesData.length > 0) {
       const firstCell = String(salesData[0][0]).toLowerCase();
-      if (firstCell === 'date' || firstCell === 'തീയതി') validSales = salesData.slice(1);
+      if (firstCell === 'date') validSales = salesData.slice(1);
       else validSales = salesData;
     }
 
@@ -61,7 +61,7 @@ const Ledger = () => {
     let validCollections = [];
     if (collectionsData && collectionsData.length > 0) {
       const firstCell = String(collectionsData[0][0]).toLowerCase();
-      if (firstCell === 'date' || firstCell === 'തീയതി') validCollections = collectionsData.slice(1);
+      if (firstCell === 'date') validCollections = collectionsData.slice(1);
       else validCollections = collectionsData;
     }
 
@@ -209,10 +209,10 @@ const Ledger = () => {
         <div>
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <BookOpen color="var(--accent-color)" size={28} />
-            Ledger (കണക്ക് പുസ്തകം)
+            Ledger
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '0.95rem' }}>
-            ഷോപ്പുകളുടെ ആകെ വിൽപ്പന, കിട്ടിയ തുക, ബാക്കി കുടിശ്ശിക എന്നിവയുടെ ലെഡ്ജർ
+            Overview of shop sales, payments received, and outstanding balances
           </p>
         </div>
 
@@ -229,7 +229,7 @@ const Ledger = () => {
             <AlertCircle size={28} />
           </div>
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Outstanding (ആകെ കുടിശ്ശിക)</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Outstanding</span>
             <h3 style={{ margin: '4px 0 0 0', fontSize: '1.4rem', color: '#ef4444' }}>
               ₹{overallTotals.due.toLocaleString()}
             </h3>
@@ -241,7 +241,7 @@ const Ledger = () => {
             <TrendingUp size={28} />
           </div>
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Sales (ആകെ വിൽപ്പന)</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Sales</span>
             <h3 style={{ margin: '4px 0 0 0', fontSize: '1.4rem', color: '#3b82f6' }}>
               ₹{overallTotals.sales.toLocaleString()}
             </h3>
@@ -253,7 +253,7 @@ const Ledger = () => {
             <CheckCircle2 size={28} />
           </div>
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Received (ആകെ ലഭിച്ചത്)</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Received</span>
             <h3 style={{ margin: '4px 0 0 0', fontSize: '1.4rem', color: '#10b981' }}>
               ₹{overallTotals.received.toLocaleString()}
             </h3>
@@ -437,7 +437,7 @@ const Ledger = () => {
               <div className="form-group" style={{ marginBottom: '14px' }}>
                 <label>Payment Mode:</label>
                 <select value={modalPaymentMode} onChange={(e) => setModalPaymentMode(e.target.value)}>
-                  <option value="Cash">Cash (പണം)</option>
+                  <option value="Cash">Cash</option>
                   <option value="GPay / UPI">Google Pay / UPI</option>
                   <option value="Bank Transfer">Bank Transfer</option>
                   <option value="Cheque">Cheque</option>
