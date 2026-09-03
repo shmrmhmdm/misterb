@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getCollections, addCollection, editCollection, deleteCollection, getShops, getSales } from '../services/api';
+import { getCollections, addCollection, editCollection, deleteCollection, getShops, getSales, getUsers } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { 
   Wallet, 
@@ -22,6 +22,7 @@ const Collections = () => {
   const [collections, setCollections] = useState([]);
   const [shopsList, setShopsList] = useState([]);
   const [salesList, setSalesList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', message: '' });
@@ -33,12 +34,21 @@ const Collections = () => {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  const getLoggedInUserName = () => {
+    try {
+      const u = sessionStorage.getItem('misterb_user');
+      return u ? JSON.parse(u).name || '' : '';
+    } catch {
+      return '';
+    }
+  };
+
   const initialFormState = {
     date: new Date().toISOString().split('T')[0],
     shop: '',
     amount: '',
     paymentMode: 'Cash',
-    collectedBy: '',
+    collectedBy: getLoggedInUserName(),
     notes: ''
   };
   const [formData, setFormData] = useState(initialFormState);
@@ -49,10 +59,11 @@ const Collections = () => {
 
   const fetchAllData = async () => {
     setLoading(true);
-    const [collData, shopsData, salesData] = await Promise.all([
+    const [collData, shopsData, salesData, usersData] = await Promise.all([
       getCollections(),
       getShops(),
-      getSales()
+      getSales(),
+      getUsers()
     ]);
 
     // Process collections with row numbers for editing
@@ -87,6 +98,29 @@ const Collections = () => {
       validSales = (firstCell === 'date') ? salesData.slice(1) : salesData;
     }
     setSalesList(validSales);
+
+    // Process Users for Collected By dropdown
+    if (usersData && usersData.length > 0) {
+      const firstCell = String(usersData[0][0] || '').toLowerCase();
+      const hasHeader = firstCell.includes('phone') || firstCell.includes('mobile') || firstCell.includes('number');
+      const startIndex = hasHeader ? 1 : 0;
+      let parsedU = [];
+      for (let i = startIndex; i < usersData.length; i++) {
+        const name = String(usersData[i][1] || '').trim();
+        const role = String(usersData[i][2] || 'Staff').trim();
+        const status = String(usersData[i][3] || 'Active').trim().toLowerCase();
+        if (name && status !== 'inactive' && status !== 'blocked') {
+          parsedU.push({ name, role, phone: usersData[i][0] });
+        }
+      }
+      setUsersList(parsedU);
+      if (!formData.collectedBy && parsedU.length > 0) {
+        const defaultName = getLoggedInUserName() || parsedU[0].name;
+        setFormData(prev => ({ ...prev, collectedBy: defaultName }));
+      }
+    } else {
+      setUsersList([]);
+    }
 
     setLoading(false);
   };
@@ -434,15 +468,35 @@ const Collections = () => {
             <div className="form-group">
               <label>
                 <User size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                Collected By
+                Collected By (Staff / Collector)
               </label>
-              <input 
-                type="text" 
-                name="collectedBy" 
-                placeholder="Salesman / Collector name" 
-                value={formData.collectedBy} 
-                onChange={handleChange} 
-              />
+              {usersList.length > 0 ? (
+                <select 
+                  name="collectedBy" 
+                  value={formData.collectedBy} 
+                  onChange={handleChange}
+                >
+                  <option value="">-- Select Collector / Staff --</option>
+                  {usersList.map((u, i) => (
+                    <option key={i} value={u.name}>
+                      {u.name} ({u.role || 'Staff'})
+                    </option>
+                  ))}
+                  {formData.collectedBy && !usersList.some(u => u.name.toLowerCase() === formData.collectedBy.toLowerCase()) && (
+                    <option value={formData.collectedBy}>
+                      {formData.collectedBy} (Existing)
+                    </option>
+                  )}
+                </select>
+              ) : (
+                <input 
+                  type="text" 
+                  name="collectedBy" 
+                  placeholder="Salesman / Collector name" 
+                  value={formData.collectedBy} 
+                  onChange={handleChange} 
+                />
+              )}
             </div>
 
             {/* Notes / Remarks */}

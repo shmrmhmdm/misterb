@@ -1,23 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { getSales, addSale, editSale, deleteSale, getShops, getProducts } from '../services/api';
+import { getSales, addSale, editSale, deleteSale, getShops, getProducts, getUsers } from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
   const [shopsList, setShopsList] = useState([]);
   const [productsList, setProductsList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
   const [editingRow, setEditingRow] = useState(null); // stores Google Sheet row index
   
+  // Get active logged in user name if available
+  const getLoggedInUserName = () => {
+    try {
+      const u = sessionStorage.getItem('misterb_user');
+      return u ? JSON.parse(u).name || '' : '';
+    } catch {
+      return '';
+    }
+  };
+
   const initialFormState = {
     date: new Date().toISOString().split('T')[0],
     shop: '',
     item: '',
     qty: '',
     price: '',
-    saleBy: '',
+    saleBy: getLoggedInUserName(),
     cashReceived: ''
   };
   const [formData, setFormData] = useState(initialFormState);
@@ -28,8 +39,8 @@ const Sales = () => {
 
   const fetchSalesAndMasters = async () => {
     setLoading(true);
-    const [salesData, shopsData, productsData] = await Promise.all([
-      getSales(), getShops(), getProducts()
+    const [salesData, shopsData, productsData, usersData] = await Promise.all([
+      getSales(), getShops(), getProducts(), getUsers()
     ]);
     
     // Process sales with row numbers for editing
@@ -61,6 +72,30 @@ const Sales = () => {
       if (firstCell.includes('item') || firstCell.includes('product')) setProductsList(productsData.slice(1));
       else setProductsList(productsData);
     } else setProductsList([]);
+
+    // Process Users for Sale By dropdown
+    if (usersData && usersData.length > 0) {
+      const firstCell = String(usersData[0][0] || '').toLowerCase();
+      const hasHeader = firstCell.includes('phone') || firstCell.includes('mobile') || firstCell.includes('number');
+      const startIndex = hasHeader ? 1 : 0;
+      let parsedU = [];
+      for (let i = startIndex; i < usersData.length; i++) {
+        const name = String(usersData[i][1] || '').trim();
+        const role = String(usersData[i][2] || 'Staff').trim();
+        const status = String(usersData[i][3] || 'Active').trim().toLowerCase();
+        if (name && status !== 'inactive' && status !== 'blocked') {
+          parsedU.push({ name, role, phone: usersData[i][0] });
+        }
+      }
+      setUsersList(parsedU);
+      // Auto set default saleBy if empty
+      if (!formData.saleBy && parsedU.length > 0) {
+        const defaultName = getLoggedInUserName() || parsedU[0].name;
+        setFormData(prev => ({ ...prev, saleBy: defaultName }));
+      }
+    } else {
+      setUsersList([]);
+    }
     
     setLoading(false);
   };
@@ -202,8 +237,38 @@ const Sales = () => {
             </div>
             
             <div className="form-group form-grid-full">
-              <label className="form-label">Sale By</label>
-              <input type="text" name="saleBy" className="form-input" value={formData.saleBy} onChange={handleChange} required />
+              <label className="form-label">Sale By (Staff / Salesman)</label>
+              {usersList.length > 0 ? (
+                <select 
+                  name="saleBy" 
+                  className="form-input" 
+                  value={formData.saleBy} 
+                  onChange={handleChange} 
+                  required
+                >
+                  <option value="">-- Select Staff / Salesman --</option>
+                  {usersList.map((u, i) => (
+                    <option key={i} value={u.name}>
+                      {u.name} ({u.role || 'Staff'})
+                    </option>
+                  ))}
+                  {formData.saleBy && !usersList.some(u => u.name.toLowerCase() === formData.saleBy.toLowerCase()) && (
+                    <option value={formData.saleBy}>
+                      {formData.saleBy} (Existing)
+                    </option>
+                  )}
+                </select>
+              ) : (
+                <input 
+                  type="text" 
+                  name="saleBy" 
+                  className="form-input" 
+                  placeholder="Salesman name" 
+                  value={formData.saleBy} 
+                  onChange={handleChange} 
+                  required 
+                />
+              )}
             </div>
           </div>
           <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '8px', padding: '12px 24px', width: '100%' }}>
