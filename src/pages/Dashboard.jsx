@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getSales, getExpenses, getLedger, getCollections } from '../services/api';
+import { getSales, getExpenses, getLedger, getCollections, getShops, getProducts } from '../services/api';
 import {
   ResponsiveContainer,
   BarChart,
@@ -28,7 +28,11 @@ import {
   ShoppingBag, 
   ArrowDownLeft, 
   DollarSign, 
-  CheckCircle2 
+  CheckCircle2,
+  Store,
+  Package,
+  Search,
+  Building2
 } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
@@ -73,17 +77,29 @@ const Dashboard = () => {
     totalReceived: 0,
     totalOutstanding: 0,
     totalExpenses: 0,
-    netCash: 0
+    netCash: 0,
+    totalShopsCount: 0,
+    totalProductsCount: 0
   });
   
   const [shopDetails, setShopDetails] = useState([]);
   const [expenseDetails, setExpenseDetails] = useState([]);
+  const [allShopsList, setAllShopsList] = useState([]);
+  const [allProductsList, setAllProductsList] = useState([]);
+
+  // Modals state
   const [showModal, setShowModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [selectedStaffModal, setSelectedStaffModal] = useState(null);
+  const [showShopsModal, setShowShopsModal] = useState(false);
+  const [showProductsModal, setShowProductsModal] = useState(false);
+
+  // Search states for modals
+  const [shopSearch, setShopSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
 
   // Raw data from Google Sheets
-  const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [], collections: [] });
+  const [rawData, setRawData] = useState({ sales: [], expenses: [], ledger: [], collections: [], shops: [], products: [] });
 
   useEffect(() => {
     fetchData();
@@ -91,17 +107,17 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!loading && rawData.sales.length >= 0) {
-      calculateSummary(rawData.sales, rawData.expenses, rawData.ledger, rawData.collections, selectedMonth);
+      calculateSummary(rawData.sales, rawData.expenses, rawData.ledger, rawData.collections, rawData.shops, rawData.products, selectedMonth);
     }
   }, [selectedMonth, rawData]);
 
   const fetchData = async () => {
     setLoading(true);
-    const [salesData, expensesData, ledgerData, collectionsData] = await Promise.all([
-      getSales(), getExpenses(), getLedger(), getCollections()
+    const [salesData, expensesData, ledgerData, collectionsData, shopsData, productsData] = await Promise.all([
+      getSales(), getExpenses(), getLedger(), getCollections(), getShops(), getProducts()
     ]);
     
-    setRawData({ sales: salesData, expenses: expensesData, ledger: ledgerData, collections: collectionsData });
+    setRawData({ sales: salesData, expenses: expensesData, ledger: ledgerData, collections: collectionsData, shops: shopsData, products: productsData });
     setLoading(false);
   };
 
@@ -113,7 +129,7 @@ const Dashboard = () => {
     return d;
   };
 
-  const calculateSummary = (salesData, expensesData, ledgerData, collectionsData, monthStr) => {
+  const calculateSummary = (salesData, expensesData, ledgerData, collectionsData, shopsData, productsData, monthStr) => {
     let totalSales = 0;
     let cashAtSale = 0;
     let dueCollections = 0;
@@ -244,10 +260,100 @@ const Dashboard = () => {
       }))
       .filter(c => c.amount > 0);
 
+    // Process All Registered Shops
+    let parsedAllShops = [];
+    if (shopsData && shopsData.length > 0) {
+      const firstCell = String(shopsData[0][0] || '').toLowerCase();
+      const hasHeader = firstCell.includes('shop');
+      const startIdx = hasHeader ? 1 : 0;
+      for (let i = startIdx; i < shopsData.length; i++) {
+        const sName = String(shopsData[i][0] || '').trim();
+        const sDetails = shopsData[i][1] || '';
+        if (sName) {
+          const shopOut = shopOutstandings[sName]?.outstanding || 0;
+          let shopMonthSales = 0;
+          let shopAllTimeSales = 0;
+          let shopOrdersCount = 0;
+
+          validSales.forEach(row => {
+            if (String(row[1] || '').trim().toLowerCase() === sName.toLowerCase()) {
+              const price = Number(row[4]) || 0;
+              shopAllTimeSales += price;
+              shopOrdersCount++;
+              if (isSameMonth(row[0])) {
+                shopMonthSales += price;
+              }
+            }
+          });
+
+          parsedAllShops.push({
+            name: sName,
+            details: sDetails,
+            outstanding: shopOut,
+            monthSales: shopMonthSales,
+            allTimeSales: shopAllTimeSales,
+            ordersCount: shopOrdersCount
+          });
+        }
+      }
+    }
+
+    // Process All Registered Products/Items
+    let parsedAllProducts = [];
+    if (productsData && productsData.length > 0) {
+      const firstCell = String(productsData[0][0] || '').toLowerCase();
+      const hasHeader = firstCell.includes('item') || firstCell.includes('product');
+      const startIdx = hasHeader ? 1 : 0;
+      for (let i = startIdx; i < productsData.length; i++) {
+        const pName = String(productsData[i][0] || '').trim();
+        const pPrice = Number(productsData[i][1]) || 0;
+        if (pName) {
+          let monthQty = 0;
+          let monthRevenue = 0;
+          let allTimeQty = 0;
+          let allTimeRevenue = 0;
+
+          validSales.forEach(row => {
+            if (String(row[2] || '').trim().toLowerCase() === pName.toLowerCase()) {
+              const qty = Number(row[3]) || 0;
+              const price = Number(row[4]) || 0;
+              allTimeQty += qty;
+              allTimeRevenue += price;
+              if (isSameMonth(row[0])) {
+                monthQty += qty;
+                monthRevenue += price;
+              }
+            }
+          });
+
+          parsedAllProducts.push({
+            name: pName,
+            price: pPrice,
+            monthQty,
+            monthRevenue,
+            allTimeQty,
+            allTimeRevenue
+          });
+        }
+      }
+    }
+
     const netCash = totalReceived - totalExpenses;
-    setSummary({ totalSales, cashAtSale, dueCollections, totalReceived, totalOutstanding, totalExpenses, netCash });
+    setSummary({
+      totalSales,
+      cashAtSale,
+      dueCollections,
+      totalReceived,
+      totalOutstanding,
+      totalExpenses,
+      netCash,
+      totalShopsCount: parsedAllShops.length,
+      totalProductsCount: parsedAllProducts.length
+    });
     setShopDetails(formattedShopDetails);
     setExpenseDetails(formattedExpenseDetails);
+    setAllShopsList(parsedAllShops);
+    setAllProductsList(parsedAllProducts);
   };
 
   // --- CHART 1: Daily Trend in Selected Month ---
@@ -521,6 +627,38 @@ const Dashboard = () => {
             >
               <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>Total Outstanding <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
               <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{summary.totalOutstanding.toLocaleString()}</p>
+            </div>
+
+            {/* Total Shops Card */}
+            <div 
+              className="card" 
+              style={{ background: 'rgba(56, 189, 248, 0.1)', borderLeft: '4px solid #38bdf8', cursor: 'pointer', transition: 'transform 0.2s' }}
+              onClick={() => setShowShopsModal(true)}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title="Click to view all shops list"
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem', margin: 0 }}>Total Shops <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
+                <Store size={20} color="#38bdf8" />
+              </div>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '8px 0 0 0', color: '#38bdf8' }}>{summary.totalShopsCount}</p>
+            </div>
+
+            {/* Total Items Card */}
+            <div 
+              className="card" 
+              style={{ background: 'rgba(236, 72, 153, 0.1)', borderLeft: '4px solid #ec4899', cursor: 'pointer', transition: 'transform 0.2s' }}
+              onClick={() => setShowProductsModal(true)}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title="Click to view all items list"
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h3 style={{ color: 'var(--text-secondary)', fontSize: '1rem', margin: 0 }}>Total Items <small style={{fontSize:'0.7rem'}}>(Click details)</small></h3>
+                <Package size={20} color="#ec4899" />
+              </div>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '8px 0 0 0', color: '#ec4899' }}>{summary.totalProductsCount}</p>
             </div>
             
             <div className="card" style={{ background: 'rgba(99, 102, 241, 0.1)', borderLeft: '4px solid #6366f1', gridColumn: '1 / -1' }}>
@@ -970,6 +1108,220 @@ const Dashboard = () => {
                     <tr>
                       <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
                         No transactions recorded.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for All Registered Shops */}
+      {showShopsModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', 
+          zIndex: 1000, padding: '16px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '750px', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.3rem' }}>
+                  <Store size={24} color="#38bdf8" />
+                  <span>All Registered Shops ({allShopsList.length})</span>
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Complete directory of registered shops and their sales & outstanding performance
+                </span>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowShopsModal(false);
+                  setShopSearch('');
+                }} 
+                style={{ background: 'none', border: 'none', fontSize: '1.8rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ marginBottom: '16px', position: 'relative' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="🔍 Search shop by name or address/phone..."
+                value={shopSearch}
+                onChange={(e) => setShopSearch(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '0.95rem' }}
+              />
+            </div>
+
+            {/* Shops Table */}
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Shop Name</th>
+                    <th>Address / Contact</th>
+                    <th>Orders</th>
+                    <th>Month Sales (₹)</th>
+                    <th>Outstanding (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allShopsList
+                    .filter(s => {
+                      const q = shopSearch.toLowerCase();
+                      return s.name.toLowerCase().includes(q) || (s.details && s.details.toLowerCase().includes(q));
+                    })
+                    .map((shop, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <strong style={{ color: 'var(--text-primary)' }}>{shop.name}</strong>
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {shop.details || '-'}
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)' }}>
+                            {shop.ordersCount}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: '600', color: '#60a5fa' }}>
+                          ₹{shop.monthSales.toLocaleString()}
+                        </td>
+                        <td>
+                          <span className={`badge ${shop.outstanding > 0 ? 'badge-danger' : 'badge-success'}`}>
+                            ₹{shop.outstanding.toLocaleString()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  {allShopsList.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                        No shops registered yet.
+                      </td>
+                    </tr>
+                  )}
+                  {allShopsList.length > 0 && allShopsList.filter(s => {
+                    const q = shopSearch.toLowerCase();
+                    return s.name.toLowerCase().includes(q) || (s.details && s.details.toLowerCase().includes(q));
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                        No matching shops found for "{shopSearch}".
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for All Products / Items */}
+      {showProductsModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', 
+          zIndex: 1000, padding: '16px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '750px', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.3rem' }}>
+                  <Package size={24} color="#ec4899" />
+                  <span>All Items & Products ({allProductsList.length})</span>
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Product catalog with default prices and monthly sales performance
+                </span>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowProductsModal(false);
+                  setProductSearch('');
+                }} 
+                style={{ background: 'none', border: 'none', fontSize: '1.8rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ marginBottom: '16px', position: 'relative' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="🔍 Search item by name..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '0.95rem' }}
+              />
+            </div>
+
+            {/* Products Table */}
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Default Price (₹)</th>
+                    <th>Qty Sold (Month)</th>
+                    <th>Revenue (Month)</th>
+                    <th>All-Time Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allProductsList
+                    .filter(p => {
+                      const q = productSearch.toLowerCase();
+                      return p.name.toLowerCase().includes(q);
+                    })
+                    .map((prod, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <strong style={{ color: 'var(--text-primary)' }}>{prod.name}</strong>
+                        </td>
+                        <td style={{ fontWeight: '600', color: '#ec4899' }}>
+                          ₹{prod.price.toLocaleString()}
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
+                            {prod.monthQty} units
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: '600', color: '#10b981' }}>
+                          ₹{prod.monthRevenue.toLocaleString()}
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)' }}>
+                            {prod.allTimeQty} units
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  {allProductsList.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                        No items registered in catalog yet.
+                      </td>
+                    </tr>
+                  )}
+                  {allProductsList.length > 0 && allProductsList.filter(p => {
+                    const q = productSearch.toLowerCase();
+                    return p.name.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                        No matching items found for "{productSearch}".
                       </td>
                     </tr>
                   )}
